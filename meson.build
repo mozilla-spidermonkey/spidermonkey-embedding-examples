@@ -6,6 +6,7 @@ cxx = meson.get_compiler('cpp')
 args = ['-std=c++14', '-Wall']
 
 spidermonkey = dependency('mozjs-60')
+readline = cxx.find_library('readline')
 
 # Check if SpiderMonkey was compiled with --enable-debug. If this is the case,
 # you must compile all your sources with -DDEBUG=1.
@@ -65,3 +66,4 @@ add_project_arguments(cxx.get_supported_arguments(test_warning_args),
 
 executable('hello', 'examples/hello.cpp', dependencies: spidermonkey)
 executable('cookbook', 'examples/cookbook.cpp', dependencies: spidermonkey)
+executable('repl', 'examples/repl.cpp', dependencies: [spidermonkey, readline])

@@ -10,6 +10,9 @@ it.
 Generally this means that the `mozjs-60.pc` file needs to be installed
 in a location known to pkg-config.
 
+For the REPL example, you will need readline installed where Meson can
+find it, as well.
+
 ## To build ##
 
 To compile these examples, build in the toplevel directory:
@@ -37,3 +40,5 @@ in the `meson.build` file, and add a description of it to this
 - **cookbook.cpp** - Based on an old wiki page called "JSAPI Cookbook",
   this program doesn't do anything in particular but contains a lot of
   examples showing how to do common operations with SpiderMonkey.
+- **repl.cpp** - Best practices for creating a mini JavaScript
+  interpreter, consisting of a read-eval-print loop.
