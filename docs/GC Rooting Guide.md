@@ -127,6 +127,13 @@ someFunction(JSContext* cx, JS::HandleObject obj) {
 }
 ```
 
+There is also a static constructor method `Handle::fromMarkedLocation()`
+that creates a `JS::Handle<T>` from an arbitrary location.
+This is used to make `JS::Handle`s for things that aren't explicitly
+rooted themselves, but are always reachable from the stack roots.
+Every use of these should be commented to explain why they are
+guaranteed to be rooted.
+
 ### JS::MutableHandle<T> ###
 
 All GC thing pointers that are used as out-parameters must be wrapped in
@@ -224,6 +231,43 @@ virtual `trace()` method.
 The implementation should trace all the GC things contained in the
 object by calling `JS::TraceEdge`.
 
+### Common Pitfalls ###
+
+The C++ type system allows us to eliminate the possibility of most
+common errors; however, there are still a few things that you can get
+wrong that the compiler cannot help you with.
+There is basically never a good reason to do any of these.
+If you think you do need to do one of these, ask on one of
+SpiderMonkey's support forums: maybe we've already solved your problem
+using a different mechanism.
+
+- Storing a `JS::Rooted<T>` on the heap.
+  It would be very easy to violate the LIFO constraint if you did this.
+  Use `JS::Heap<T>` (see below) if you store a GC thing on the heap.
+- Storing a `JS::Handle<T>` on the heap.
+  It is very easy for the handle to outlive its root if you do this.
+- Returning a `JS::Handle<T>` from a function.
+  If you do this, a handle may outlive its root.
+
+### Performance Tweaking ###
+
+If the extra overhead of exact rooting does end up adding an
+unacceptable cost to a specific code path, there are some tricks you can
+use to get better performance at the cost of more complex code.
+
+- Move `JS::Rooted<T>` declarations above loops.
+  Modern C++ compilers are not smart enough to do LICM on
+  `JS::Rooted<T>`, so forward declaring a single `JS::Rooted<T>` above
+  the loop and re-using it on every iteration can save some cycles.
+- Raw pointers.
+  If you are 100% sure that there is no way for SpiderMonkey to GC while
+  the pointer is on the stack, this is an option. Note: SpiderMonkey can
+  GC because of any error, GC because of timers, GC because we are low
+  on memory, GC because of environment variables, GC because of cosmic
+  rays, etc.
+  This is not a terribly safe option for embedder code, so only consider
+  this as a very last resort.
+
 ## GC things on the heap ##
 
 ### `JS::Heap<T>` ###
@@ -279,6 +323,24 @@ All GC pointers stored on the heap must be traced.
 For simple JSClasses without a private struct, or subclasses of
 `js::BaseProxyHandler`, this is normally done by storing them in
 reserved slots, which are automatically traced by the GC.
+
+```c++
+JSClass FooClass = {
+    "FooPrototype",
+    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(1),
+    &FooClassOps
+};
+JS::RootedObject obj(cx, JS_NewObject(cx, &FooClass));
+JS::RootedValue v(cx, JS::ObjectValue(*otherGCThing));
+js::SetReservedSlot(obj, 0, v);
+```
+
+Do not use `JS_SetPrivate()` to store a pointer to a GC thing.
+The private field is frequently used to store pointers that are not
+GC things, so the GC cannot automatically handle this slot.
+This means it must be manually traced by the object's owner: this is
+both fragile and more expensive than using an extra reserved slot, or
+even just putting a new property on the object.
 
 #### JSClass ####
 
