@@ -233,7 +233,10 @@ The only exception to this is if they are added as roots with the
 `JS::PersistentRooted` class, but don't do this unless it's really
 necessary.
 **`JS::Heap<T>` pointers must also continue to be traced in the normal
-way**, which is covered below.
+way**, and how to do that is explained below.
+That is, wrapping the value in `JS::Heap<T>` only protects the pointer
+from becoming invalid when the GC thing it points to gets moved.
+It does not protect the GC thing from being collected by the GC!
 
 `JS::Heap<T>` doesn't require a `JSContext*`, and can be constructed
 with or without an initial value parameter.
@@ -339,6 +342,53 @@ dangerous thing to use — it will keep a GC thing alive, and most GC
 things end up keeping their global alive, so if your class/struct is
 reachable in any way from that global, then nothing will ever be cleaned
 up by the GC.
+
+It's also possible to add a custom tracer using
+`JS_AddExtraGCRootsTracer()`.
+Each tracer that gets added needs to be removed again later with
+`JS_RemoveExtraGCRootsTracer()`.
+Obviously it's faster to add (and later remove) one function that gets called during GC and loops over many objects than adding (and removing) many objects to the GC root set.
+
+## Testing Rooting ##
+
+### JS_GC_ZEAL (increased GC frequency) ###
+
+This is a debugging feature to increase the frequency of garbage
+collections.
+It should reveal issues that would only show up in rare cases under
+normal circumstances.
+If the feature is enabled in the SpiderMonkey build (`--enable-gczeal`),
+you can set the environment variable `JS_GC_ZEAL` to configure
+debugging.
+Set it to -1 to print a table of possible settings (or look up that
+table in jsgc.cpp).
+
+The most useful settings probably are:
+
+- 2: GC every F allocations (default: 100)
+- 7: Collect the nursery every N nursery allocations
+
+You can append a number separated by a comma to specify F or N
+respectively (like "2,1" to GC after every allocation or "7,10" to do a
+minor GC every 10 nursery allocations).
+With some settings the program gets extremely slow.
+
+### Static rooting analysis ###
+
+The static rooting analysis uses a [GCC
+plugin](https://hg.mozilla.org/users/sfink_mozilla.com/sixgill) to dump
+possible callstacks that can cause GC and statically (at compile time)
+analyse this data for rooting hazards.
+
+The main differences to dynamic rooting analysis are:
+
+- Covers all compiled code at once during compile time. There's no need to actually execute these codepaths in the game.
+- Setup is more complicated
+- Only covers stack based rooting
+- There can be false positives
+
+More information and instructions (possibly outdated) on [this wiki
+page](https://trac.wildfiregames.com/wiki/StaticRootingAnalysis).
 
 ## Summary ##
 
