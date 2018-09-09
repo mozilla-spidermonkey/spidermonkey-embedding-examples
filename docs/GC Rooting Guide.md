@@ -214,11 +214,9 @@ Here are the main AutoRooters defined:
 
 | Type                    | AutoRooter class   |
 | ----------------------- | ------------------ |
-| `JS::Value[]`           | `AutoArrayRooter`  |
 | `js::Vector<JS::Value>` | `AutoValueVector`  |
 | `js::Vector<jsid>`      | `AutoIdVector`     |
 | `js::Vector<JSObject*>` | `AutoObjectVector` |
-| `js::Vector<JSScript*>` | `AutoScriptVector` |
 
 If your case is not covered by one of these, it is possible to write
 your own by deriving from `JS::CustomAutoRooter` and overriding the
