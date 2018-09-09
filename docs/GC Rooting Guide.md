@@ -366,7 +366,9 @@ table in jsgc.cpp).
 The most useful settings probably are:
 
 - 2: GC every F allocations (default: 100)
+- 4: Verify pre write barriers between instructions
 - 7: Collect the nursery every N nursery allocations
+- 11: Verify incremental marking
 
 You can append a number separated by a comma to specify F or N
 respectively (like "2,1" to GC after every allocation or "7,10" to do a
