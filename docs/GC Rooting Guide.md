@@ -212,11 +212,11 @@ used.
 
 Here are the main AutoRooters defined:
 
-| Type                    | AutoRooter class   |
-| ----------------------- | ------------------ |
-| `js::Vector<JS::Value>` | `AutoValueVector`  |
-| `js::Vector<jsid>`      | `AutoIdVector`     |
-| `js::Vector<JSObject*>` | `AutoObjectVector` |
+| Type                        | AutoRooter class       |
+| --------------------------- | ---------------------- |
+| `JS::AutoVector<JS::Value>` | `JS::AutoValueVector`  |
+| `JS::AutoVector<jsid>`      | `JS::AutoIdVector`     |
+| `JS::AutoVector<JSObject*>` | `JS::AutoObjectVector` |
 
 If your case is not covered by one of these, it is possible to write
 your own by deriving from `JS::CustomAutoRooter` and overriding the
