@@ -18,6 +18,8 @@ The main types of GC thing pointer are:
 - `JSString*`
 - `JSScript*`
 - `jsid`
+- `JSFunction*`
+- `JS::Symbol*`
 
 Note that `JS::Value` and `jsid` can contain pointers internally even
 though they are not a normal pointer type, hence their inclusion in this
@@ -44,13 +46,15 @@ There are typedefs available for the main types.
 Within SpiderMonkey, it is suggested that these are used in preference
 to the template class (Gecko uses the template versions):
 
-| Template class          | Typedef            |
-| ----------------------- | ------------------ |
-| `JS::Rooted<JS::Value>` | `JS::RootedValue`  |
-| `JS::Rooted<JSObject*>` | `JS::RootedObject` |
-| `JS::Rooted<JSString*>` | `JS::RootedString` |
-| `JS::Rooted<JSScript*>` | `JS::RootedScript` |
-| `JS::Rooted<jsid>`      | `JS::RootedId`     |
+| Template class            | Typedef              |
+| ------------------------- | -------------------- |
+| `JS::Rooted<JS::Value>`   | `JS::RootedValue`    |
+| `JS::Rooted<JSObject*>`   | `JS::RootedObject`   |
+| `JS::Rooted<JSString*>`   | `JS::RootedString`   |
+| `JS::Rooted<JSScript*>`   | `JS::RootedScript`   |
+| `JS::Rooted<jsid>`        | `JS::RootedId`       |
+| `JS::Rooted<JSFunction*>` | `JS::RootedFunction` |
+| `JS::Rooted<JS::Symbol*>` | `JS::RootedSymbol`   |
 
 For example, instead of this:
 
@@ -93,13 +97,15 @@ the `JS::Rooted<T>` that it was created for.
 Similarly to `JS::Rooted<T>`, there are typedefs available for the main
 types:
 
-| Template class          | Typedef            |
-| ----------------------- | ------------------ |
-| `JS::Handle<JS::Value>` | `JS::HandleValue`  |
-| `JS::Handle<JSObject*>` | `JS::HandleObject` |
-| `JS::Handle<JSString*>` | `JS::HandleString` |
-| `JS::Handle<JSScript*>` | `JS::HandleScript` |
-| `JS::Handle<jsid>`      | `JS::HandleId`     |
+| Template class            | Typedef              |
+| ------------------------- | -------------------- |
+| `JS::Handle<JS::Value>`   | `JS::HandleValue`    |
+| `JS::Handle<JSObject*>`   | `JS::HandleObject`   |
+| `JS::Handle<JSString*>`   | `JS::HandleString`   |
+| `JS::Handle<JSScript*>`   | `JS::HandleScript`   |
+| `JS::Handle<jsid>`        | `JS::HandleId`       |
+| `JS::Handle<JSFunction*>` | `JS::HandleFunction` |
+| `JS::Handle<JS::Symbol*>` | `JS::HandleSymbol`   |
 
 You should use `JS::Handle<T>` for all function parameters taking GC
 thing pointers (except out-parameters, which are described below).
@@ -136,13 +142,15 @@ explicitly.
 There are typedefs for `JS::MutableHandle<T>`, the same as for the other
 templates:
 
-| Template class                 | Typedef                   |
-| ------------------------------ | ------------------------- |
-| `JS::MutableHandle<JS::Value>` | `JS::MutableHandleValue`  |
-| `JS::MutableHandle<JSObject*>` | `JS::MutableHandleObject` |
-| `JS::MutableHandle<JSString*>` | `JS::MutableHandleString` |
-| `JS::MutableHandle<JSScript*>` | `JS::MutableHandleScript` |
-| `JS::MutableHandle<jsid>`      | `JS::MutableHandleId`     |
+| Template class                   | Typedef                     |
+| -------------------------------- | --------------------------- |
+| `JS::MutableHandle<JS::Value>`   | `JS::MutableHandleValue`    |
+| `JS::MutableHandle<JSObject*>`   | `JS::MutableHandleObject`   |
+| `JS::MutableHandle<JSString*>`   | `JS::MutableHandleString`   |
+| `JS::MutableHandle<JSScript*>`   | `JS::MutableHandleScript`   |
+| `JS::MutableHandle<jsid>`        | `JS::MutableHandleId`       |
+| `JS::MutableHandle<JSFunction*>` | `JS::MutableHandleFunction` |
+| `JS::MutableHandle<JS::Symbol*>` | `JS::MutableHandleSymbol`   |
 
 `JS::MutableHandle<T>` should be used for all out-parameters, for
 example instead of:
