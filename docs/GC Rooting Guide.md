@@ -270,16 +270,18 @@ struct HeapStruct
 
 ### Tracing ###
 
-#### `js::NativeObject` ####
+#### Simple JSClasses and Proxies ####
 
 All GC pointers stored on the heap must be traced.
-For regular `js::NativeObject`s, this is normally done by storing them
-in slots, which are automatically traced by the GC.
+For simple JSClasses without a private struct, or subclasses of
+`js::BaseProxyHandler`, this is normally done by storing them in
+reserved slots, which are automatically traced by the GC.
 
-#### Other JSObjects ####
+#### JSClass ####
 
-When defining a JSObject subclass that contains `Heap<T>` fields, [set
-the trace hook](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/JSAPI_reference/JSTraceOp)
+When defining a JSClass with a private struct that contains `Heap<T>`
+fields, [set the trace
+hook](https://searchfox.org/mozilla-central/search?q=JSTraceOp)
 to invoke a function that traces those fields.
 
 #### General Classes/Structures ####
@@ -295,17 +297,15 @@ JSObject, the usual way would be to define a trace hook on the JSObject
 `trace()` on it:
 
 ```c++
-class MyObject : public JSObject {
-    ...
-    static void trace(JSTracer* trc, JSObject* obj) {
-        MyClass* mine = static_cast<MyClass*>(obj->getPrivate());
-        mine->trace(trc, "MyClass private field");
-    }
-};
-
 class MyClass {
     Heap<JSString*> str;
+
   public:
+    static void trace(JSTracer* trc, JSObject* obj) {
+        auto* mine = static_cast<MyClass*>(JS_GetPrivate(obj));
+        mine->trace(trc, "MyClass private field");
+    }
+
     void trace(JSTracer* trc, const char* name) {
         JS::TraceEdge(trc, &str, "my string");
     }
