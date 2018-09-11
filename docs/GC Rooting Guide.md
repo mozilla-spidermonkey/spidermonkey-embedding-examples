@@ -428,13 +428,13 @@ table in GCEnum.h).
 
 The most useful settings probably are:
 
-- 2: GC every F allocations (default: 100)
-- 4: Verify pre write barriers between instructions
-- 7: Collect the nursery every N nursery allocations
-- 11: Verify incremental marking
+- `Alloc`: Collect every N allocations (default: 100)
+- `VerifierPre`: Verify pre write barriers between instructions
+- `GenerationalGC`: Collect the nursery every N nursery allocations
+- `IncrementalMarkingValidator`: Verify incremental marking
 
-You can append a number separated by a comma to specify F or N
-respectively (like "2,1" to GC after every allocation or "7,10" to do a
+You can append a number separated by a comma to specify N (like
+`Alloc,1` to GC after every allocation or `GenerationalGC,10` to do a
 minor GC every 10 nursery allocations).
 With some settings the program gets extremely slow.
 
