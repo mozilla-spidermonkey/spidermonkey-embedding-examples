@@ -1,5 +1,15 @@
 # SpiderMonkey Embedding Examples #
 
+## Prerequsisites ##
+
+You need Meson 0.43.0 or later to build the examples.
+Installation instructions for Meson are [here](https://mesonbuild.com/Getting-meson.html).
+
+You will also need SpiderMonkey ESR 60 installed where Meson can find
+it.
+Generally this means that the `mozjs-60.pc` file needs to be installed
+in a location known to pkg-config.
+
 ## To build ##
 
 To compile these examples, build in the toplevel directory:
