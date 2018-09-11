@@ -29,7 +29,7 @@ If you use these types directly, or create classes, structs or arrays
 that contain them, you must follow the rules set out in this guide.
 If you do not your program will not work correctly — if it works at all.
 
-## GC things on the stack ##
+## GC thing pointers on the stack ##
 
 ### `JS::Rooted<T>` ###
 
@@ -243,7 +243,8 @@ using a different mechanism.
 
 - Storing a `JS::Rooted<T>` on the heap.
   It would be very easy to violate the LIFO constraint if you did this.
-  Use `JS::Heap<T>` (see below) if you store a GC thing on the heap.
+  Use `JS::Heap<T>` (see below) if you store a GC thing pointer on the
+  heap.
 - Storing a `JS::Handle<T>` on the heap.
   It is very easy for the handle to outlive its root if you do this.
 - Returning a `JS::Handle<T>` from a function.
@@ -268,7 +269,7 @@ use to get better performance at the cost of more complex code.
   This is not a terribly safe option for embedder code, so only consider
   this as a very last resort.
 
-## GC things on the heap ##
+## GC thing pointers on the heap ##
 
 ### `JS::Heap<T>` ###
 
