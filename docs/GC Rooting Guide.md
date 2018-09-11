@@ -424,7 +424,7 @@ If the feature is enabled in the SpiderMonkey build (`--enable-gczeal`),
 you can set the environment variable `JS_GC_ZEAL` to configure
 debugging.
 Set it to -1 to print a table of possible settings (or look up that
-table in jsgc.cpp).
+table in GCEnum.h).
 
 The most useful settings probably are:
 
