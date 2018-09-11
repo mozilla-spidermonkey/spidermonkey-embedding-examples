@@ -1,5 +1,5 @@
 project('spidermonkey-embedding-examples', 'cpp', version: 'esr60',
-    default_options: ['warning_level=3'])
+    meson_version: '>= 0.43.0', default_options: ['warning_level=3'])
 
 cxx = meson.get_compiler('cpp')
 
