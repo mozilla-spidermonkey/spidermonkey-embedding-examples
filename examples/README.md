@@ -29,3 +29,8 @@ tools/git-pre-commit-format install
 If adding a new example to the examples directory, make sure to build it
 in the `meson.build` file, and add a description of it to this
 `README.md` file.
+
+## List of examples ##
+
+- **hello.cpp** - Simple Hello World program, shows how to do the bare
+  minimum to embed SpiderMonkey and execute a single line of JS code.
