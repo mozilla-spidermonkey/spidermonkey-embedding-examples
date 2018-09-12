@@ -798,6 +798,7 @@ ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
  * How to write your own JSClass with reserved slots.
  * Create global variable __dirname to retrieve the current JavaScript file
  * name, like in NodeJS
+ * Custom error reporter
  */
 
 /**** BOILERPLATE *************************************************************/
