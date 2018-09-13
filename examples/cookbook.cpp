@@ -22,6 +22,9 @@
  * var isNull = v === null;
  * var isBoolean = typeof v === "boolean";
  * var isObject = typeof v === "object" && v !== null;
+ * var isSymbol = typeof v === "symbol";
+ * var isFunction = typeof v === "function";
+ * var isUndefined = typeof v === "undefined";
  */
 static void
 GetTypeOfValue(JSContext* cx, JS::HandleValue v)
@@ -34,6 +37,9 @@ GetTypeOfValue(JSContext* cx, JS::HandleValue v)
   bool isBoolean = v.isBoolean();
   bool isObject =
     v.isObject(); // NOTE: not broken like typeof === "object" is :-)
+  bool isSymbol = v.isSymbol();
+  bool isFunction = v.isObject() && JS::IsCallable(&v.toObject());
+  bool isUndefined = v.isUndefined();
 
   // Avoid compiler warnings
   mozilla::Unused << isString;
@@ -42,6 +48,9 @@ GetTypeOfValue(JSContext* cx, JS::HandleValue v)
   mozilla::Unused << isNull;
   mozilla::Unused << isBoolean;
   mozilla::Unused << isObject;
+  mozilla::Unused << isSymbol;
+  mozilla::Unused << isFunction;
+  mozilla::Unused << isUndefined;
 }
 
 /* To set a value use a correspondingly named member mutator function, or assign
@@ -56,12 +65,16 @@ GetTypeOfValue(JSContext* cx, JS::HandleValue v)
  * v = null;
  * v = undefined;
  * v = false;
+ * v = {};
+ * v = new Symbol(someString);
  */
 static void
 SetValue(JSContext* cx)
 {
   JS::RootedValue v(cx);
   JS::RootedString someString(cx, JS_NewStringCopyZ(cx, "my string"));
+  JS::RootedObject obj(cx, JS_NewPlainObject(cx));
+  JS::RootedSymbol symbol(cx, JS::NewSymbol(cx, someString));
 
   // clang-format off
   v.setInt32(0);           /* or: */ v = JS::Int32Value(0);
@@ -70,6 +83,8 @@ SetValue(JSContext* cx)
   v.setNull();             /* or: */ v = JS::NullValue();
   v.setUndefined();        /* or: */ v = JS::UndefinedValue();
   v.setBoolean(false);     /* or: */ v = JS::BooleanValue(false);
+  v.setObject(*obj);       /* or: */ v = JS::ObjectValue(*obj);
+  v.setSymbol(symbol);     /* or: */ v = JS::SymbolValue(symbol);
   // clang-format on
 }
 
