@@ -68,17 +68,25 @@ GetTypeOfValue(JSContext* cx, JS::HandleValue v)
  * v = {};
  * v = new Symbol(someString);
  */
-static void
+static bool
 SetValue(JSContext* cx)
 {
   JS::RootedValue v(cx);
   JS::RootedString someString(cx, JS_NewStringCopyZ(cx, "my string"));
+  if (!someString)
+    return false;
   JS::RootedObject obj(cx, JS_NewPlainObject(cx));
+  if (!obj)
+    return false;
   JS::RootedSymbol symbol(cx, JS::NewSymbol(cx, someString));
+  if (!symbol)
+    return false;
 
   // clang-format off
   v.setInt32(0);           /* or: */ v = JS::Int32Value(0);
   v.setDouble(0.5);        /* or: */ v = JS::DoubleValue(0.5);
+  v.setNumber(0);          /* or: */ v = JS::NumberValue(0);
+  v.setNumber(0.5);        /* or: */ v = JS::NumberValue(0.5);
   v.setString(someString); /* or: */ v = JS::StringValue(someString);
   v.setNull();             /* or: */ v = JS::NullValue();
   v.setUndefined();        /* or: */ v = JS::UndefinedValue();
@@ -86,6 +94,8 @@ SetValue(JSContext* cx)
   v.setObject(*obj);       /* or: */ v = JS::ObjectValue(*obj);
   v.setSymbol(symbol);     /* or: */ v = JS::SymbolValue(symbol);
   // clang-format on
+
+  return true;
 }
 
 ///// Finding the global object ////////////////////////////////////////////////
@@ -143,7 +153,7 @@ DefineGlobalFunction(JSContext* cx, JS::HandleObject global)
   if (!JS_DefineFunction(cx, global, "justForFun", &JustForFun, 0, 0))
     return false;
 
-  // Really, "if (x) return false; else return true;" is bad style, just
+  // Really, "if (!x) return false; else return true;" is bad style, just
   // "return x;" instead, but normally you might have other code between the
   // "return false" and "return true".
   return true;
@@ -256,8 +266,9 @@ CallGlobalFunction(JSContext* cx, JS::HandleObject global)
 {
   JS::RootedValue r(cx);
   if (!JS_CallFunctionName(
-        cx, global, "foo", JS::HandleValueArray::empty(), &r))
+        cx, global, "foo", JS::HandleValueArray::empty(), &r)) {
     return false;
+  }
 
   return true;
 }
@@ -285,7 +296,7 @@ CallLocalFunctionVariable(JSContext* cx, JS::HandleValue f)
  * return 23;
  *
  * Warning: This only works for integers that fit in 32 bits.
- * Otherwise, convert the number to floating point (see the next example).
+ * Otherwise, use setNumber or setDouble (see the next example).
  */
 static bool
 ReturnInteger(JSContext* cx, unsigned argc, JS::Value* vp)
@@ -381,8 +392,10 @@ ThrowError(JSContext* cx,
   // The JSAPI code here is actually simulating `throw Error(message)` without
   // the new, as new is a bit harder to simulate using the JSAPI. In this case,
   // unless the script has redefined Error, it amounts to the same thing.
-  if (JS_CallFunctionName(cx, global, "Error", args, &exc))
-    JS_SetPendingException(cx, exc);
+  if (!JS_CallFunctionName(cx, global, "Error", args, &exc))
+    return false;
+
+  JS_SetPendingException(cx, exc);
   return false;
 }
 
@@ -528,23 +541,18 @@ GetProperty(JSContext* cx, JS::HandleValue y)
 }
 
 /* That code will crash if y is not an object. That's often unacceptable. An
- * alternative would be to simulate the behavior of the JavaScript . notation
- * exactly. It's a nice thought—JavaScript wouldn't crash, at least—but
- * implementing its exact behavior turns out to be quite complicated, and most
- * of the work is not particularly helpful.
- *
- * Usually it is best to check for !y.isObject() and throw an Error with a nice
- * message.
+ * alternative would be to simulate the behavior of the JavaScript . notation,
+ * which will "work" but tends to silently hide errors (as for example would
+ * JavaScript `var x = 4; return x.myprop;`).
  */
 static bool
 GetPropertySafe(JSContext* cx, JS::HandleObject global, JS::HandleValue y)
 {
-  JS::RootedValue x(cx);
+  JS::RootedObject yobj(cx);
+  if (!JS_ValueToObject(cx, y, &yobj))
+    return false;
 
-  if (!y.isObject())
-    return THROW_ERROR(
-      cx, global, "Parameter y must be an object."); // see the #throw example
-  JS::RootedObject yobj(cx, &y.toObject());
+  JS::RootedValue x(cx);
   if (!JS_GetProperty(cx, yobj, "myprop", &x))
     return false;
 
@@ -562,8 +570,9 @@ GetPropertySafe(JSContext* cx, JS::HandleObject global, JS::HandleValue y)
 static bool
 SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
 {
-  assert(y.isObject());
-  JS::RootedObject yobj(cx, &y.toObject());
+  JS::RootedObject yobj(cx);
+  if (!JS_ValueToObject(cx, y, &yobj))
+    return false;
   if (!JS_SetProperty(cx, yobj, "myprop", x))
     return false;
 
@@ -581,18 +590,13 @@ SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
  * object.
  */
 static bool
-CheckProperty(JSContext* cx, JS::HandleValue y)
+CheckProperty(JSContext* cx, JS::HandleValue y, bool* found)
 {
-  bool found;
-
-  assert(y.isObject());
-  JS::RootedObject yobj(cx, &y.toObject());
-  if (!JS_HasProperty(cx, yobj, "myprop", &found))
+  JS::RootedObject yobj(cx);
+  if (!JS_ValueToObject(cx, y, &yobj))
     return false;
-  if (found) {
-    // then do something
-  }
-
+  if (!JS_HasProperty(cx, yobj, "myprop", found))
+    return false;
   return true;
 }
 
@@ -697,8 +701,12 @@ DefineGetterSetterProperty(JSContext* cx, JS::HandleObject obj)
 static bool
 DefineReadOnlyProperty(JSContext* cx, JS::HandleObject obj)
 {
-  if (!JS_DefineProperty(
-        cx, obj, "read_only_prop", GetPropFunc, nullptr, JSPROP_ENUMERATE)) {
+  if (!JS_DefineProperty(cx,
+                         obj,
+                         "read_only_prop",
+                         GetPropFunc,
+                         nullptr, /* setter */
+                         JSPROP_ENUMERATE)) {
     return false;
   }
 
@@ -723,8 +731,10 @@ GetMD5Func(JSContext* cx, unsigned argc, JS::Value* vp)
 {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   // Implement your MD5 hashing here...
-  args.rval().setString(
-    JS_NewStringCopyZ(cx, "d41d8cd98f00b204e9800998ecf8427e"));
+  JSString* hashstr = JS_NewStringCopyZ(cx, "d41d8cd98f00b204e9800998ecf8427e");
+  if (!hashstr)
+    return false;
+  args.rval().setString(hashstr);
   return true;
 }
 
@@ -748,9 +758,14 @@ ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
   JS::RootedObject string_prototype(cx, &val.toObject());
 
   // ...and now we can add some new functionality to all strings.
-  if (!JS_DefineProperty(
-        cx, string_prototype, "md5sum", GetMD5Func, nullptr, JSPROP_ENUMERATE))
+  if (!JS_DefineProperty(cx,
+                         string_prototype,
+                         "md5sum",
+                         GetMD5Func,
+                         nullptr,
+                         JSPROP_ENUMERATE)) {
     return false;
+  }
 
   return true;
 }
@@ -770,8 +785,11 @@ ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
 static JSClassOps globalOps = { nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, nullptr, nullptr, JS_GlobalObjectTraceHook };
 
-static JSClass globalClass = { "CookbookGlobal", JSCLASS_GLOBAL_FLAGS,
-  &globalOps };
+static JSClass globalClass = {
+    "CookbookGlobal",
+    JSCLASS_GLOBAL_FLAGS,
+    &globalOps
+};
 // clang-format on
 
 static bool
@@ -823,8 +841,9 @@ CreateGlobal(JSContext* cx)
 
   JSAutoCompartment ac(cx, global);
   if (!JS_InitStandardClasses(cx, global) ||
-      !JS_DefineFunctions(cx, global, globalFunctions))
+      !JS_DefineFunctions(cx, global, globalFunctions)) {
     return nullptr;
+  }
 
   return global;
 }
@@ -886,12 +905,14 @@ Run(JSContext* cx)
 
   JS::RootedValue v(cx, JS::NullValue());
   GetTypeOfValue(cx, v);
-  SetValue(cx);
+  if (!SetValue(cx))
+    return false;
 
   if (!DefineGlobalFunction(cx, global) || !CreateArray(cx) ||
       !CreateObject(cx) || !ConstructObjectWithNew(cx, global) ||
-      !CallGlobalFunction(cx, global))
+      !CallGlobalFunction(cx, global)) {
     return false;
+  }
 
   JS::RootedValue f(cx);
   JSFunction* newFunction = JS_NewFunction(cx, JustForFun, 0, 0, "f");
@@ -931,11 +952,21 @@ Run(JSContext* cx)
     return false;
   JS::RootedValue v_obj(cx, JS::ObjectValue(*obj));
   JS::RootedValue v_prop(cx, JS::Int32Value(42));
-  if (!SetProperty(cx, v_obj, v_prop) || !CheckProperty(cx, v_obj) ||
-      !GetProperty(cx, v_obj) || !GetPropertySafe(cx, global, v_obj) ||
-      !DefineConstantProperty(cx, obj) ||
-      !DefineGetterSetterProperty(cx, obj) ||
-      !DefineReadOnlyProperty(cx, obj) || !ModifyStringPrototype(cx, global))
+  if (!SetProperty(cx, v_obj, v_prop))
+    return false;
+  if (!CheckProperty(cx, v_obj))
+    return false;
+  if (!GetProperty(cx, v_obj))
+    return false;
+  if (!GetPropertySafe(cx, global, v_obj))
+    return false;
+  if (!DefineConstantProperty(cx, obj))
+    return false;
+  if (!DefineGetterSetterProperty(cx, obj))
+    return false;
+  if (!DefineReadOnlyProperty(cx, obj))
+    return false;
+  if (!ModifyStringPrototype(cx, global))
     return false;
 
   // Also execute each of the JSNative functions we defined:
