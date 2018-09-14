@@ -791,11 +791,180 @@ ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
   return true;
 }
 
+/**** Defining classes ********************************************************/
+
+/* This defines a constructor function, a prototype object, and properties of
+ * the prototype and of the constructor, all with one API call.
+ *
+ * Initialize a class by defining its constructor function, prototype, and
+ * per-instance and per-class properties.
+ * The latter are called "static" below by analogy to Java.
+ * They are defined in the constructor object's scope, so that
+ * `MyClass.myStaticProp` works along with `new MyClass()`.
+ *
+ * `JS_InitClass` takes a lot of arguments, but you can pass `nullptr` for
+ * any of the last four if there are no such properties or methods.
+ *
+ * Note that you do not need to call `JS_InitClass` to make a new instance
+ * of that class—otherwise there would be a chicken-and-egg problem making
+ * the global object—but you should call `JS_InitClass` if you require a
+ * constructor function for script authors to call via `new`, and/or a
+ * class prototype object (`MyClass.prototype`) for authors to extend with
+ * new properties at run time.
+ * In general, if you want to support multiple instances that share
+ * behavior, use `JS_InitClass`.
+ *
+ * // JavaScript:
+ * class MyClass {
+ *     constructor(a, b) {
+ *         this._a = a;
+ *         this._b = b;
+ *     }
+ *     get prop() { return 42; }
+ *     method() { return this.a + this.b; }
+ *     static get static_prop() { return 'static'; }
+ *     static static_method(a, b) { return a + b; }
+ * }
+ */
+static JSClass myClass = { "MyClass", JSCLASS_HAS_RESERVED_SLOTS(2), nullptr };
+
+enum MyClassSlots
+{
+  SlotA,
+  SlotB
+};
+
+static bool
+MyClassPropGetter(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  args.rval().setInt32(42);
+  return true;
+}
+
+static bool
+MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+
+  JS::RootedValue v_a(cx, JS_GetReservedSlot(thisObj, SlotA));
+  JS::RootedValue v_b(cx, JS_GetReservedSlot(thisObj, SlotB));
+
+  double a, b;
+  if (!JS::ToNumber(cx, v_a, &a) || !JS::ToNumber(cx, v_b, &b))
+    return false;
+
+  args.rval().setDouble(a + b);
+  return true;
+}
+
+static bool
+MyClassStaticPropGetter(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JSString* str = JS_NewStringCopyZ(cx, "static");
+  if (!str)
+    return false;
+  args.rval().setString(str);
+  return true;
+}
+
+static bool
+MyClassStaticMethod(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args.requireAtLeast(cx, "static_method", 2))
+    return false;
+
+  double a, b;
+  if (!JS::ToNumber(cx, args[0], &a) || !JS::ToNumber(cx, args[1], &b))
+    return false;
+
+  args.rval().setDouble(a + b);
+  return true;
+}
+
+static JSPropertySpec MyClassProperties[] = {
+  JS_PSG("prop", MyClassPropGetter, JSPROP_ENUMERATE),
+  JS_PS_END
+};
+
+static JSFunctionSpec MyClassMethods[] = {
+  JS_FN("method", MyClassMethod, 0, JSPROP_ENUMERATE),
+  JS_FS_END
+};
+
+static JSPropertySpec MyClassStaticProperties[] = {
+  JS_PSG("static_prop", MyClassStaticPropGetter, JSPROP_ENUMERATE),
+  JS_PS_END
+};
+
+static JSFunctionSpec MyClassStaticMethods[] = {
+  JS_FN("static_method", MyClassStaticMethod, 2, JSPROP_ENUMERATE),
+  JS_FS_END
+};
+
+static bool
+MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args.requireAtLeast(cx, "MyClass", 2))
+    return false;
+  if (!args.isConstructing()) {
+    JS_ReportErrorASCII(cx, "You must call this constructor with 'new'");
+    return false;
+  }
+  JS::RootedObject thisObj(cx, JS_NewObjectForConstructor(cx, &myClass, args));
+  if (!thisObj)
+    return false;
+
+  // Slightly different from the 'private' properties in the JS example, here
+  // we use reserved slots to store the a and b values. These are not accessible
+  // from JavaScript.
+  JS_SetReservedSlot(thisObj, SlotA, args[0]);
+  JS_SetReservedSlot(thisObj, SlotB, args[1]);
+
+  args.rval().setObject(*thisObj);
+  return true;
+}
+
+static bool
+DefineMyClass(JSContext* cx, JS::HandleObject global)
+{
+  JS::RootedObject protoObj(
+    cx,
+    JS_InitClass(
+      cx,
+      global,
+      nullptr,
+      &myClass,
+      // native constructor function and min arg count
+      MyClassConstructor,
+      2,
+
+      // prototype object properties and methods -- these will be "inherited" by
+      // all instances through delegation up the instance's prototype link.
+      MyClassProperties,
+      MyClassMethods,
+
+      // class constructor properties and methods
+      MyClassStaticProperties,
+      MyClassStaticMethods));
+  if (!protoObj)
+    return false;
+
+  // You can add anything else here to protoObj (which is available as
+  // MyClass.prototype in JavaScript). For example, call JS_DefineProperty() to
+  // add data properties to the prototype.
+
+  return true;
+}
+
 /**** WANTED ******************************************************************/
 
 /* Simulating `for` and `for...of`.
  * Actually outputting errors.
- * How to write your own JSClass with reserved slots.
  * Create global variable __dirname to retrieve the current JavaScript file
  * name, like in NodeJS
  * Custom error reporter
@@ -989,6 +1158,17 @@ Run(JSContext* cx)
   if (!DefineReadOnlyProperty(cx, obj))
     return false;
   if (!ModifyStringPrototype(cx, global))
+    return false;
+
+  if (!DefineMyClass(cx, global))
+    return false;
+  if (!ExecuteCode(cx, R"js(
+        const m = new MyClass(1, 2);
+        m.method();
+        m.prop;
+        MyClass.static_prop;
+        MyClass.static_method(2, 3);
+      )js"))
     return false;
 
   // Also execute each of the JSNative functions we defined:
