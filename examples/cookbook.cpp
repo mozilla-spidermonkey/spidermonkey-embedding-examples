@@ -82,18 +82,29 @@ SetValue(JSContext* cx)
   if (!symbol)
     return false;
 
-  // clang-format off
-  v.setInt32(0);           /* or: */ v = JS::Int32Value(0);
-  v.setDouble(0.5);        /* or: */ v = JS::DoubleValue(0.5);
-  v.setNumber(0u);         /* or: */ v = JS::NumberValue(0);
-  v.setNumber(0.5);        /* or: */ v = JS::NumberValue(0.5);
-  v.setString(someString); /* or: */ v = JS::StringValue(someString);
-  v.setNull();             /* or: */ v = JS::NullValue();
-  v.setUndefined();        /* or: */ v = JS::UndefinedValue();
-  v.setBoolean(false);     /* or: */ v = JS::BooleanValue(false);
-  v.setObject(*obj);       /* or: */ v = JS::ObjectValue(*obj);
-  v.setSymbol(symbol);     /* or: */ v = JS::SymbolValue(symbol);
-  // clang-format on
+  v.setInt32(0);
+  v.setDouble(0.5);
+  v.setNumber(0u);
+  v.setNumber(0.5);
+  v.setString(someString);
+  v.setNull();
+  v.setUndefined();
+  v.setBoolean(false);
+  v.setObject(*obj);
+  v.setSymbol(symbol);
+
+  // or:
+
+  v = JS::Int32Value(0);
+  v = JS::DoubleValue(0.5);
+  v = JS::NumberValue(0);
+  v = JS::NumberValue(0.5);
+  v = JS::StringValue(someString);
+  v = JS::NullValue();
+  v = JS::UndefinedValue();
+  v = JS::BooleanValue(false);
+  v = JS::ObjectValue(*obj);
+  v = JS::SymbolValue(symbol);
 
   return true;
 }
