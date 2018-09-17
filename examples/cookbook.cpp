@@ -111,7 +111,8 @@ SetValue(JSContext* cx)
 
 ///// Finding the global object ////////////////////////////////////////////////
 
-/* Many of these recipes require finding the current global object first.
+/* Sometimes in a C++ function called from JavaScript, you will need to have
+ * access to the global object.
  *
  * // JavaScript
  * var global = this;
@@ -128,8 +129,9 @@ FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp)
   if (!global)
     return false;
 
-  /* Check with JS::CurrentGlobalOrNull() for comparison: */
+  // For comparison, here's how to do it with JS::CurrentGlobalOrNull():
   JS::RootedObject global2(cx, JS::CurrentGlobalOrNull(cx));
+
   if (global != global2) {
     JS_ReportErrorASCII(cx, "Globals did not agree");
     return false;
@@ -198,7 +200,7 @@ CreateObject(JSContext* cx)
     return false;
 
   // or:
-  x = JS_NewObject(cx, nullptr);
+  x = JS_NewObject(cx, /* clasp = */ nullptr);
   if (!x)
     return false;
 
