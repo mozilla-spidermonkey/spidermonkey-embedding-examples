@@ -85,7 +85,7 @@ SetValue(JSContext* cx)
   // clang-format off
   v.setInt32(0);           /* or: */ v = JS::Int32Value(0);
   v.setDouble(0.5);        /* or: */ v = JS::DoubleValue(0.5);
-  v.setNumber(0);          /* or: */ v = JS::NumberValue(0);
+  v.setNumber(0u);         /* or: */ v = JS::NumberValue(0);
   v.setNumber(0.5);        /* or: */ v = JS::NumberValue(0.5);
   v.setString(someString); /* or: */ v = JS::StringValue(someString);
   v.setNull();             /* or: */ v = JS::NullValue();
