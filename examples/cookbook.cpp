@@ -603,13 +603,19 @@ SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
  * object.
  */
 static bool
-CheckProperty(JSContext* cx, JS::HandleValue y, bool* found)
+CheckProperty(JSContext* cx, JS::HandleValue y)
 {
+  bool found;
+
   JS::RootedObject yobj(cx);
   if (!JS_ValueToObject(cx, y, &yobj))
     return false;
-  if (!JS_HasProperty(cx, yobj, "myprop", found))
+  if (!JS_HasProperty(cx, yobj, "myprop", &found))
     return false;
+  if (found) {
+    // then do something
+  }
+
   return true;
 }
 
