@@ -599,19 +599,21 @@ SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
  *     // then do something
  * }
  *
- * See "Getting a property", above, concerning the case where y is not an
- * object.
+ * In the case where y is not an object, here we just proceed as if the property
+ * did not exist. Compare "Getting a property", above.
  */
 static bool
 CheckProperty(JSContext* cx, JS::HandleValue y)
 {
   bool found;
 
-  JS::RootedObject yobj(cx);
-  if (!JS_ValueToObject(cx, y, &yobj))
-    return false;
-  if (!JS_HasProperty(cx, yobj, "myprop", &found))
-    return false;
+  if (!y.isObject()) {
+    found = false;
+  } else {
+    JS::RootedObject yobj(cx, &y.toObject());
+    if (!JS_HasProperty(cx, yobj, "myprop", &found))
+      return false;
+  }
   if (found) {
     // then do something
   }
