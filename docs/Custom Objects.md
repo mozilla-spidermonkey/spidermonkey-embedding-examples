@@ -30,9 +30,12 @@ There are two ways to create custom objects that the JS engine can use:
 
 In either case, if you create an object and then want it to persist in
 the run time where it can be used by other scripts, you must root the
-object by calling `JS_AddRoot` or `JS_AddNamedRoot`.
-Using these functions ensures that the JS engine will keep track of the
-objects and clean them up during garbage collection, if appropriate.
+object.
+The easiest way is to install it as a property on the global object with
+`JS_DefineProperty`.
+This way, it's accessible from other scripts that you run, and the JS
+engine will keep track of it and clean it up only when the global object
+is cleaned up.
 
 ## Creating an object from a script ##
 
