@@ -35,7 +35,7 @@ Then it adds whatever custom classes, functions, and variables (like
 `window`) the application wants to provide; see [Custom
 objects](#custom-objects) below.
 Each time the application runs a JS script (using, for example,
-`JS_EvaluateScript`), it provides the global object for that script to
+`JS::Evaluate`), it provides the global object for that script to
 use.
 As the script runs, it can create global functions and variables of its
 own.

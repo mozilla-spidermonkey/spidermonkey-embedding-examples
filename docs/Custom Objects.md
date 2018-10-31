@@ -57,11 +57,9 @@ To create a custom object using a script:
    Embed the appropriate JS engine call(s) in your application to
    compile and execute the script.
    You have two choices: 1.) compile and execute a script with a single
-   call to `JS_EvaluateScript`, `JS_EvaluateUCScript` or 2.) compile the
-   script once with a call to `JS_CompileScript` or
-   `JS_CompileUCScript`, and then execute it repeatedly with individual
-   calls to `JS_ExecuteScript`. The "UC" versions of these calls provide
-   support for Unicode-encoded scripts.
+   call to `JS::Evaluate`, or 2.) compile the script once with a call to
+   `JS::Compile`, and then execute it repeatedly with individual calls
+   to `JS_ExecuteScript`.
 
 An object you create using a script only can be made available only
 during the lifetime of the script, or can be created to persist after
