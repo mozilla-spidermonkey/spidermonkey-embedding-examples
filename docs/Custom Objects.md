@@ -85,8 +85,7 @@ An application can create a custom object without bothering with a
    custom object's properties, including getters and setters.
 3. Declare a `JSFunctionSpec` array containing information about your
    custom object's methods.
-4. Call `JS_NewObject`, `JS_ConstructObject`, or `JS_DefineObject` to
-   create the object.
+4. Call `JS_NewPlainObject` to create the object.
 5. Call `JS_DefineProperties` to define the object's properties.
 6. Call `JS_DefineFunctions` to define the object's methods.
 
