@@ -21,28 +21,47 @@
 // FIXME: need to set an enqueue promise job callback, or Promise.then crashes
 // FIXME: add a "quit()" function
 
-// clang-format off
-static JSClassOps globalOps = {
-  nullptr, // addProperty
-  nullptr, // deleteProperty
-  nullptr, // enumerate
-  nullptr, // newEnumerate
-  nullptr, // resolve
-  nullptr, // mayResolve
-  nullptr, // finalize
-  nullptr, // call
-  nullptr, // hasInstance
-  nullptr, // construct
-  JS_GlobalObjectTraceHook
-};
 
-/* The class of the global object. */
-static JSClass globalClass = {
-  "ReplGlobal",
-  JSCLASS_GLOBAL_FLAGS,
-  &globalOps
+class ReplGlobal {
+  ReplGlobal(void)
+  {}
+
+  static ReplGlobal* priv(JSObject* global)
+  {
+    auto* retval = static_cast<ReplGlobal*>(JS_GetPrivate(global));
+    assert(retval);
+    return retval;
+  }
+
+  // clang-format off
+  static constexpr JSClassOps classOps = {
+    nullptr, // addProperty
+    nullptr, // deleteProperty
+    nullptr, // enumerate
+    nullptr, // newEnumerate
+    nullptr, // resolve
+    nullptr, // mayResolve
+    nullptr, // finalize
+    nullptr, // call
+    nullptr, // hasInstance
+    nullptr, // construct
+    JS_GlobalObjectTraceHook
+  };
+  // clang-format on
+
+  /* The class of the global object. */
+  static constexpr JSClass klass = {
+    "ReplGlobal",
+    JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
+    &ReplGlobal::classOps
+  };
+
+public:
+  static JSObject* create(JSContext* cx);
+  static void loop(JSContext* cx, JS::HandleObject global);
 };
-// clang-format on
+constexpr JSClassOps ReplGlobal::classOps;
+constexpr JSClass ReplGlobal::klass;
 
 static void
 die(const char* why)
@@ -276,14 +295,17 @@ CreateContext(void)
   return cx;
 }
 
-static JSObject*
-CreateGlobal(JSContext* cx)
+JSObject*
+ReplGlobal::create(JSContext* cx)
 {
   JS::CompartmentOptions options;
   JS::RootedObject global(
     cx,
     JS_NewGlobalObject(
-      cx, &globalClass, nullptr, JS::FireOnNewGlobalHook, options));
+      cx, &ReplGlobal::klass, nullptr, JS::FireOnNewGlobalHook, options));
+
+  ReplGlobal* priv = new ReplGlobal();
+  JS_SetPrivate(global, priv);
 
   // Add standard JavaScript classes to the global so we have a useful
   // environment.
@@ -316,7 +338,7 @@ EvalAndPrint(JSContext* cx, const std::string& buffer, unsigned lineno)
 }
 
 void
-Loop(JSContext* cx, JS::HandleObject global)
+ReplGlobal::loop(JSContext* cx, JS::HandleObject global)
 {
   bool eof = false;
   unsigned lineno = 1;
@@ -352,7 +374,7 @@ Run(JSContext* cx)
 {
   JSAutoRequest ar(cx);
 
-  JS::RootedObject global(cx, CreateGlobal(cx));
+  JS::RootedObject global(cx, ReplGlobal::create(cx));
   if (!global)
     return false;
 
@@ -361,7 +383,7 @@ Run(JSContext* cx)
   JS::SetWarningReporter(
     cx, [](JSContext*, JSErrorReport* report) { PrintError(report); });
 
-  Loop(cx, global);
+  ReplGlobal::loop(cx, global);
 
   std::cout << '\n';
   return true;
