@@ -19,11 +19,12 @@
  * Windows you may have to set your terminal's codepage to UTF-8. */
 
 // FIXME: need to set an enqueue promise job callback, or Promise.then crashes
-// FIXME: add a "quit()" function
-
 
 class ReplGlobal {
+  bool m_shouldQuit : 1;
+
   ReplGlobal(void)
+    : m_shouldQuit(false)
   {}
 
   static ReplGlobal* priv(JSObject* global)
@@ -31,6 +32,20 @@ class ReplGlobal {
     auto* retval = static_cast<ReplGlobal*>(JS_GetPrivate(global));
     assert(retval);
     return retval;
+  }
+
+  static bool quit(JSContext* cx, unsigned argc, JS::Value* vp)
+  {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+    if (!global)
+      return false;
+
+    // Return an "uncatchable" exception, by returning false without setting an
+    // exception to be pending. We distinguish it from any other uncatchable
+    // that the JS engine might throw, by setting m_shouldQuit
+    priv(global)->m_shouldQuit = true;
+    return false;
   }
 
   // clang-format off
@@ -56,12 +71,18 @@ class ReplGlobal {
     &ReplGlobal::classOps
   };
 
+  static constexpr JSFunctionSpec functions[] = {
+    JS_FN("quit", &ReplGlobal::quit, 0, 0),
+    JS_FS_END
+  };
+
 public:
   static JSObject* create(JSContext* cx);
   static void loop(JSContext* cx, JS::HandleObject global);
 };
 constexpr JSClassOps ReplGlobal::classOps;
 constexpr JSClass ReplGlobal::klass;
+constexpr JSFunctionSpec ReplGlobal::functions[];
 
 static void
 die(const char* why)
@@ -313,6 +334,10 @@ ReplGlobal::create(JSContext* cx)
   if (!JS_InitStandardClasses(cx, global))
     return nullptr;
 
+  // Define any extra global functions that we want in our environment.
+  if (!JS_DefineFunctions(cx, global, ReplGlobal::functions))
+    return nullptr;
+
   return global;
 }
 
@@ -364,9 +389,11 @@ ReplGlobal::loop(JSContext* cx, JS::HandleObject global)
     } while (
       !JS_BufferIsCompilableUnit(cx, global, buffer.c_str(), buffer.length()));
 
-    if (!EvalAndPrint(cx, buffer, startline))
-      ReportAndClearException(cx);
-  } while (!eof);
+    if (!EvalAndPrint(cx, buffer, startline)) {
+      if (!priv(global)->m_shouldQuit)
+        ReportAndClearException(cx);
+    }
+  } while (!eof && !priv(global)->m_shouldQuit);
 }
 
 static bool
