@@ -7,6 +7,7 @@
 #include <js/Conversions.h>
 #include <js/Initialization.h>
 #include <jsapi.h>
+#include <jsfriendapi.h>
 #include <mozilla/Unused.h>
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -17,8 +18,6 @@
 /* NOTE: This example assumes that it's okay to print UTF-8 encoded text to
  * stdout and stderr. On Linux and macOS this will usually be the case. On
  * Windows you may have to set your terminal's codepage to UTF-8. */
-
-// FIXME: need to set an enqueue promise job callback, or Promise.then crashes
 
 class ReplGlobal {
   bool m_shouldQuit : 1;
@@ -45,6 +44,7 @@ class ReplGlobal {
     // exception to be pending. We distinguish it from any other uncatchable
     // that the JS engine might throw, by setting m_shouldQuit
     priv(global)->m_shouldQuit = true;
+    js::StopDrainingJobQueue(cx);
     return false;
   }
 
@@ -311,8 +311,18 @@ CreateContext(void)
   JSContext* cx = JS_NewContext(8L * 1024 * 1024);
   if (!cx)
     return nullptr;
+
+  // This is so that we can use Promises in the REPL, which will be resolved
+  // after each line of input is processed. A more sophisticated embedding might
+  // have its own task scheduling, in which case you would use
+  // JS::SetEnqueuePromiseJobCallback(), JS::SetGetIncumbentGlobalCallback(),
+  // and JS::SetPromiseRejectionTrackerCallback().
+  if (!js::UseInternalJobQueues(cx))
+    return nullptr;
+
   if (!JS::InitSelfHostedCode(cx))
     return nullptr;
+
   return cx;
 }
 
@@ -393,6 +403,8 @@ ReplGlobal::loop(JSContext* cx, JS::HandleObject global)
       if (!priv(global)->m_shouldQuit)
         ReportAndClearException(cx);
     }
+
+    js::RunJobs(cx);
   } while (!eof && !priv(global)->m_shouldQuit);
 }
 
