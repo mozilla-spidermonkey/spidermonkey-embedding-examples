@@ -8,7 +8,15 @@ Installation instructions for Meson are [here](https://mesonbuild.com/Getting-me
 You will also need SpiderMonkey ESR 60 installed where Meson can find
 it.
 Generally this means that the `mozjs-60.pc` file needs to be installed
-in a location known to pkg-config.
+in a location known to pkg-config, and the `libmozjs-60.so` file needs
+to be in the path for loading libraries.
+
+Many Linux distributions have development packages for SpiderMonkey 60
+and if you just want to try the examples, installing that is the easiest
+way to get a build of SpiderMonkey.
+If you are on macOS or Windows, or want to do any development, read the
+[Building SpiderMonkey for Embedders](../docs/Building%20SpiderMonkey.md)
+page.
 
 For the REPL example, you will need readline installed where Meson can
 find it, as well.
