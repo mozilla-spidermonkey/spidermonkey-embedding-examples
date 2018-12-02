@@ -22,23 +22,18 @@
 class ReplGlobal {
   bool m_shouldQuit : 1;
 
-  ReplGlobal(void)
-    : m_shouldQuit(false)
-  {}
+  ReplGlobal(void) : m_shouldQuit(false) {}
 
-  static ReplGlobal* priv(JSObject* global)
-  {
+  static ReplGlobal* priv(JSObject* global) {
     auto* retval = static_cast<ReplGlobal*>(JS_GetPrivate(global));
     assert(retval);
     return retval;
   }
 
-  static bool quit(JSContext* cx, unsigned argc, JS::Value* vp)
-  {
+  static bool quit(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
-    if (!global)
-      return false;
+    if (!global) return false;
 
     // Return an "uncatchable" exception, by returning false without setting an
     // exception to be pending. We distinguish it from any other uncatchable
@@ -48,35 +43,27 @@ class ReplGlobal {
     return false;
   }
 
-  // clang-format off
-  static constexpr JSClassOps classOps = {
-    nullptr, // addProperty
-    nullptr, // deleteProperty
-    nullptr, // enumerate
-    nullptr, // newEnumerate
-    nullptr, // resolve
-    nullptr, // mayResolve
-    nullptr, // finalize
-    nullptr, // call
-    nullptr, // hasInstance
-    nullptr, // construct
-    JS_GlobalObjectTraceHook
-  };
-  // clang-format on
+  static constexpr JSClassOps classOps = {nullptr,  // addProperty
+                                          nullptr,  // deleteProperty
+                                          nullptr,  // enumerate
+                                          nullptr,  // newEnumerate
+                                          nullptr,  // resolve
+                                          nullptr,  // mayResolve
+                                          nullptr,  // finalize
+                                          nullptr,  // call
+                                          nullptr,  // hasInstance
+                                          nullptr,  // construct
+                                          JS_GlobalObjectTraceHook};
 
   /* The class of the global object. */
-  static constexpr JSClass klass = {
-    "ReplGlobal",
-    JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
-    &ReplGlobal::classOps
-  };
+  static constexpr JSClass klass = {"ReplGlobal",
+                                    JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
+                                    &ReplGlobal::classOps};
 
   static constexpr JSFunctionSpec functions[] = {
-    JS_FN("quit", &ReplGlobal::quit, 0, 0),
-    JS_FS_END
-  };
+      JS_FN("quit", &ReplGlobal::quit, 0, 0), JS_FS_END};
 
-public:
+ public:
   static JSObject* create(JSContext* cx);
   static void loop(JSContext* cx, JS::HandleObject global);
 };
@@ -84,9 +71,7 @@ constexpr JSClassOps ReplGlobal::classOps;
 constexpr JSClass ReplGlobal::klass;
 constexpr JSFunctionSpec ReplGlobal::functions[];
 
-static void
-die(const char* why)
-{
+static void die(const char* why) {
   std::cerr << "fatal error:" << why << std::endl;
   exit(1);
 }
@@ -94,37 +79,25 @@ die(const char* why)
 // The PrintError functions are modified versions of private SpiderMonkey API:
 // js/src/vm/JSContext.cpp, js::PrintError()
 
-enum class PrintErrorKind
-{
-  Error,
-  Warning,
-  StrictWarning,
-  Note
-};
+enum class PrintErrorKind { Error, Warning, StrictWarning, Note };
 
-static void
-PrintErrorLine(const std::string& prefix, JSErrorReport* report)
-{
+static void PrintErrorLine(const std::string& prefix, JSErrorReport* report) {
   const char16_t* linebuf = report->linebuf();
-  if (!linebuf)
-    return;
+  if (!linebuf) return;
 
   size_t n = report->linebufLength();
 
   std::cerr << ":\n";
-  if (!prefix.empty())
-    std::cerr << prefix;
+  if (!prefix.empty()) std::cerr << prefix;
 
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter{};
   std::string linebuf_utf8 = converter.to_bytes(linebuf);
   std::cerr << linebuf_utf8;
 
   // linebuf usually ends with a newline. If not, add one here.
-  if (n == 0 || linebuf[n - 1] != '\n')
-    std::cerr << '\n';
+  if (n == 0 || linebuf[n - 1] != '\n') std::cerr << '\n';
 
-  if (!prefix.empty())
-    std::cerr << prefix;
+  if (!prefix.empty()) std::cerr << prefix;
 
   n = report->tokenOffset();
   size_t ndots = 0;
@@ -138,20 +111,15 @@ PrintErrorLine(const std::string& prefix, JSErrorReport* report)
   std::cerr << std::string(ndots, '.') << '^';
 }
 
-static void
-PrintErrorLine(const std::string& prefix, JSErrorNotes::Note* note)
-{}
+static void PrintErrorLine(const std::string& prefix,
+                           JSErrorNotes::Note* note) {}
 
-template<typename T>
-static bool
-PrintSingleError(T* report, PrintErrorKind kind)
-{
+template <typename T>
+static bool PrintSingleError(T* report, PrintErrorKind kind) {
   std::ostringstream prefix;
-  if (report->filename)
-    prefix << report->filename << ':';
+  if (report->filename) prefix << report->filename << ':';
 
-  if (report->lineno)
-    prefix << report->lineno << ':' << report->column << ' ';
+  if (report->lineno) prefix << report->lineno << ':' << report->column << ' ';
 
   if (kind != PrintErrorKind::Error) {
     const char* kindPrefix = nullptr;
@@ -178,25 +146,21 @@ PrintSingleError(T* report, PrintErrorKind kind)
   const char* ctmp;
   while ((ctmp = strchr(message, '\n')) != 0) {
     ctmp++;
-    if (prefix)
-      std::cerr << prefix.str();
+    if (prefix) std::cerr << prefix.str();
     std::cerr.write(message, ctmp - message);
     message = ctmp;
   }
 
   /* If there were no filename or lineno, the prefix might be empty */
-  if (!prefix.str().empty())
-    std::cerr << prefix.str();
+  if (!prefix.str().empty()) std::cerr << prefix.str();
   std::cerr << message;
 
   PrintErrorLine(prefix.str(), report);
-  std::cerr << std::endl; // flushes
+  std::cerr << std::endl;  // flushes
   return true;
 }
 
-static void
-PrintError(JSErrorReport* report)
-{
+static void PrintError(JSErrorReport* report) {
   assert(report);
 
   PrintErrorKind kind = PrintErrorKind::Error;
@@ -214,9 +178,7 @@ PrintError(JSErrorReport* report)
   }
 }
 
-std::string
-FormatString(JSContext* cx, JS::HandleString string)
-{
+std::string FormatString(JSContext* cx, JS::HandleString string) {
   std::string buf = "\"";
 
   JS::UniqueChars chars(JS_EncodeStringToUTF8(cx, string));
@@ -230,9 +192,7 @@ FormatString(JSContext* cx, JS::HandleString string)
   return buf;
 }
 
-std::string
-FormatResult(JSContext* cx, JS::HandleValue value)
-{
+std::string FormatResult(JSContext* cx, JS::HandleValue value) {
   JS::RootedString str(cx);
 
   /* Special case format for strings */
@@ -275,18 +235,14 @@ FormatResult(JSContext* cx, JS::HandleValue value)
   return bytes.get();
 }
 
-static JSErrorReport*
-ErrorFromExceptionValue(JSContext* cx, JS::HandleValue exception)
-{
-  if (!exception.isObject())
-    return nullptr;
+static JSErrorReport* ErrorFromExceptionValue(JSContext* cx,
+                                              JS::HandleValue exception) {
+  if (!exception.isObject()) return nullptr;
   JS::RootedObject exceptionObject(cx, &exception.toObject());
   return JS_ErrorFromException(cx, exceptionObject);
 }
 
-static void
-ReportAndClearException(JSContext* cx)
-{
+static void ReportAndClearException(JSContext* cx) {
   /* Get exception object before printing and clearing exception. */
   JS::RootedValue exception(cx);
   if (!JS_GetPendingException(cx, &exception))
@@ -305,35 +261,27 @@ ReportAndClearException(JSContext* cx)
   PrintError(report);
 }
 
-static JSContext*
-CreateContext(void)
-{
+static JSContext* CreateContext(void) {
   JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx)
-    return nullptr;
+  if (!cx) return nullptr;
 
   // This is so that we can use Promises in the REPL, which will be resolved
   // after each line of input is processed. A more sophisticated embedding might
   // have its own task scheduling, in which case you would use
   // JS::SetEnqueuePromiseJobCallback(), JS::SetGetIncumbentGlobalCallback(),
   // and JS::SetPromiseRejectionTrackerCallback().
-  if (!js::UseInternalJobQueues(cx))
-    return nullptr;
+  if (!js::UseInternalJobQueues(cx)) return nullptr;
 
-  if (!JS::InitSelfHostedCode(cx))
-    return nullptr;
+  if (!JS::InitSelfHostedCode(cx)) return nullptr;
 
   return cx;
 }
 
-JSObject*
-ReplGlobal::create(JSContext* cx)
-{
+JSObject* ReplGlobal::create(JSContext* cx) {
   JS::CompartmentOptions options;
-  JS::RootedObject global(
-    cx,
-    JS_NewGlobalObject(
-      cx, &ReplGlobal::klass, nullptr, JS::FireOnNewGlobalHook, options));
+  JS::RootedObject global(cx,
+                          JS_NewGlobalObject(cx, &ReplGlobal::klass, nullptr,
+                                             JS::FireOnNewGlobalHook, options));
 
   ReplGlobal* priv = new ReplGlobal();
   JS_SetPrivate(global, priv);
@@ -341,19 +289,15 @@ ReplGlobal::create(JSContext* cx)
   // Add standard JavaScript classes to the global so we have a useful
   // environment.
   JSAutoCompartment ac(cx, global);
-  if (!JS_InitStandardClasses(cx, global))
-    return nullptr;
+  if (!JS_InitStandardClasses(cx, global)) return nullptr;
 
   // Define any extra global functions that we want in our environment.
-  if (!JS_DefineFunctions(cx, global, ReplGlobal::functions))
-    return nullptr;
+  if (!JS_DefineFunctions(cx, global, ReplGlobal::functions)) return nullptr;
 
   return global;
 }
 
-bool
-EvalAndPrint(JSContext* cx, const std::string& buffer, unsigned lineno)
-{
+bool EvalAndPrint(JSContext* cx, const std::string& buffer, unsigned lineno) {
   JS::CompileOptions options(cx);
   options.setUTF8(true).setFileAndLine("typein", lineno);
 
@@ -363,18 +307,14 @@ EvalAndPrint(JSContext* cx, const std::string& buffer, unsigned lineno)
 
   JS_MaybeGC(cx);
 
-  if (result.isUndefined())
-    return true;
+  if (result.isUndefined()) return true;
 
   std::string display_str = FormatResult(cx, result);
-  if (!display_str.empty())
-    std::cout << display_str << '\n';
+  if (!display_str.empty()) std::cout << display_str << '\n';
   return true;
 }
 
-void
-ReplGlobal::loop(JSContext* cx, JS::HandleObject global)
-{
+void ReplGlobal::loop(JSContext* cx, JS::HandleObject global) {
   bool eof = false;
   unsigned lineno = 1;
   do {
@@ -392,35 +332,30 @@ ReplGlobal::loop(JSContext* cx, JS::HandleObject global)
         eof = true;
         break;
       }
-      if (line[0] != '\0')
-        add_history(line);
+      if (line[0] != '\0') add_history(line);
       buffer += line;
       lineno++;
-    } while (
-      !JS_BufferIsCompilableUnit(cx, global, buffer.c_str(), buffer.length()));
+    } while (!JS_BufferIsCompilableUnit(cx, global, buffer.c_str(),
+                                        buffer.length()));
 
     if (!EvalAndPrint(cx, buffer, startline)) {
-      if (!priv(global)->m_shouldQuit)
-        ReportAndClearException(cx);
+      if (!priv(global)->m_shouldQuit) ReportAndClearException(cx);
     }
 
     js::RunJobs(cx);
   } while (!eof && !priv(global)->m_shouldQuit);
 }
 
-static bool
-Run(JSContext* cx)
-{
+static bool Run(JSContext* cx) {
   JSAutoRequest ar(cx);
 
   JS::RootedObject global(cx, ReplGlobal::create(cx));
-  if (!global)
-    return false;
+  if (!global) return false;
 
   JSAutoCompartment ac(cx, global);
 
   JS::SetWarningReporter(
-    cx, [](JSContext*, JSErrorReport* report) { PrintError(report); });
+      cx, [](JSContext*, JSErrorReport* report) { PrintError(report); });
 
   ReplGlobal::loop(cx, global);
 
@@ -428,18 +363,13 @@ Run(JSContext* cx)
   return true;
 }
 
-int
-main(int argc, const char* argv[])
-{
-  if (!JS_Init())
-    die("Could not initialize JavaScript engine.");
+int main(int argc, const char* argv[]) {
+  if (!JS_Init()) die("Could not initialize JavaScript engine.");
 
   JSContext* cx = CreateContext();
-  if (!cx)
-    die("Could not set up interpreter context.");
+  if (!cx) die("Could not set up interpreter context.");
 
-  if (!Run(cx))
-    return 1;
+  if (!Run(cx)) return 1;
 
   JS_DestroyContext(cx);
   JS_ShutDown();
