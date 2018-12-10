@@ -12,66 +12,48 @@
  * the interpreter) and a "compartment" (environment within one global object)
  * before you can execute code. */
 
-// clang-format off
-static JSClassOps globalOps = {
-  nullptr, // addProperty
-  nullptr, // deleteProperty
-  nullptr, // enumerate
-  nullptr, // newEnumerate
-  nullptr, // resolve
-  nullptr, // mayResolve
-  nullptr, // finalize
-  nullptr, // call
-  nullptr, // hasInstance
-  nullptr, // construct
-  JS_GlobalObjectTraceHook
-};
+static JSClassOps globalOps = {nullptr,  // addProperty
+                               nullptr,  // deleteProperty
+                               nullptr,  // enumerate
+                               nullptr,  // newEnumerate
+                               nullptr,  // resolve
+                               nullptr,  // mayResolve
+                               nullptr,  // finalize
+                               nullptr,  // call
+                               nullptr,  // hasInstance
+                               nullptr,  // construct
+                               JS_GlobalObjectTraceHook};
 
 // The class of the global object.
-static JSClass globalClass = {
-  "HelloWorldGlobal",
-  JSCLASS_GLOBAL_FLAGS,
-  &globalOps
-};
-// clang-format on
+static JSClass globalClass = {"HelloWorldGlobal", JSCLASS_GLOBAL_FLAGS,
+                              &globalOps};
 
-static JSContext*
-CreateContext(void)
-{
+static JSContext* CreateContext(void) {
   JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx)
-    return nullptr;
-  if (!JS::InitSelfHostedCode(cx))
-    return nullptr;
+  if (!cx) return nullptr;
+  if (!JS::InitSelfHostedCode(cx)) return nullptr;
   return cx;
 }
 
-static JSObject*
-CreateGlobal(JSContext* cx)
-{
+static JSObject* CreateGlobal(JSContext* cx) {
   JS::CompartmentOptions options;
   JS::RootedObject global(
-    cx,
-    JS_NewGlobalObject(
-      cx, &globalClass, nullptr, JS::FireOnNewGlobalHook, options));
+      cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook,
+                             options));
 
   // Add standard JavaScript classes to the global so we have a useful
   // environment.
   JSAutoCompartment ac(cx, global);
-  if (!JS_InitStandardClasses(cx, global))
-    return nullptr;
+  if (!JS_InitStandardClasses(cx, global)) return nullptr;
 
   return global;
 }
 
-static bool
-ExecuteCodePrintResult(JSContext* cx, const char* code)
-{
+static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
   JS::RootedValue rval(cx);
-  if (!JS::Evaluate(cx, options, code, strlen(code), &rval))
-    return false;
+  if (!JS::Evaluate(cx, options, code, strlen(code), &rval)) return false;
 
   // There are many ways to display an arbitrary value as a result. In this
   // case, we know that the value is a string because of the expression that we
@@ -80,14 +62,11 @@ ExecuteCodePrintResult(JSContext* cx, const char* code)
   return true;
 }
 
-static bool
-Run(JSContext* cx)
-{
+static bool Run(JSContext* cx) {
   JSAutoRequest ar(cx);
 
   JS::RootedObject global(cx, CreateGlobal(cx));
-  if (!global)
-    return false;
+  if (!global) return false;
 
   JSAutoCompartment ac(cx, global);
 
@@ -98,18 +77,13 @@ Run(JSContext* cx)
   )js");
 }
 
-int
-main(int argc, const char* argv[])
-{
-  if (!JS_Init())
-    return 1;
+int main(int argc, const char* argv[]) {
+  if (!JS_Init()) return 1;
 
   JSContext* cx = CreateContext();
-  if (!cx)
-    return 1;
+  if (!cx) return 1;
 
-  if (!Run(cx))
-    return 1;
+  if (!Run(cx)) return 1;
 
   JS_DestroyContext(cx);
   JS_ShutDown();

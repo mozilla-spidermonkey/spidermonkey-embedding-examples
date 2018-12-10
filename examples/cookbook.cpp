@@ -26,17 +26,15 @@
  * var isFunction = typeof v === "function";
  * var isUndefined = typeof v === "undefined";
  */
-static void
-GetTypeOfValue(JSContext* cx, JS::HandleValue v)
-{
+static void GetTypeOfValue(JSContext* cx, JS::HandleValue v) {
   bool isString = v.isString();
   bool isNumber = v.isNumber();
   bool isInt32 =
-    v.isInt32(); // NOTE: Internal representation, not numeric value
+      v.isInt32();  // NOTE: Internal representation, not numeric value
   bool isNull = v.isNull();
   bool isBoolean = v.isBoolean();
   bool isObject =
-    v.isObject(); // NOTE: not broken like typeof === "object" is :-)
+      v.isObject();  // NOTE: not broken like typeof === "object" is :-)
   bool isSymbol = v.isSymbol();
   bool isFunction = v.isObject() && JS::IsCallable(&v.toObject());
   bool isUndefined = v.isUndefined();
@@ -68,19 +66,14 @@ GetTypeOfValue(JSContext* cx, JS::HandleValue v)
  * v = {};
  * v = new Symbol(someString);
  */
-static bool
-SetValue(JSContext* cx)
-{
+static bool SetValue(JSContext* cx) {
   JS::RootedValue v(cx);
   JS::RootedString someString(cx, JS_NewStringCopyZ(cx, "my string"));
-  if (!someString)
-    return false;
+  if (!someString) return false;
   JS::RootedObject obj(cx, JS_NewPlainObject(cx));
-  if (!obj)
-    return false;
+  if (!obj) return false;
   JS::RootedSymbol symbol(cx, JS::NewSymbol(cx, someString));
-  if (!symbol)
-    return false;
+  if (!symbol) return false;
 
   v.setInt32(0);
   v.setDouble(0.5);
@@ -121,13 +114,10 @@ SetValue(JSContext* cx)
  * and sometimes that is the best that can be done.
  * But in a JSNative the correct way to do this is:
  */
-static bool
-FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
-  if (!global)
-    return false;
+  if (!global) return false;
 
   // For comparison, here's how to do it with JS::CurrentGlobalOrNull():
   JS::RootedObject global2(cx, JS::CurrentGlobalOrNull(cx));
@@ -149,9 +139,7 @@ FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp)
  *
  * To define many JSAPI functions at once, use JS_DefineFunctions().
  */
-static bool
-JustForFun(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool JustForFun(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setNull();
   return true;
@@ -160,9 +148,7 @@ JustForFun(JSContext* cx, unsigned argc, JS::Value* vp)
 /* Add this to your JSContext setup code.
  * This makes your C++ function visible as a global function in JavaScript.
  */
-static bool
-DefineGlobalFunction(JSContext* cx, JS::HandleObject global)
-{
+static bool DefineGlobalFunction(JSContext* cx, JS::HandleObject global) {
   if (!JS_DefineFunction(cx, global, "justForFun", &JustForFun, 0, 0))
     return false;
 
@@ -177,12 +163,9 @@ DefineGlobalFunction(JSContext* cx, JS::HandleObject global)
 /* // JavaScript
  * var x = [];  // or "x = Array()", or "x = new Array"
  */
-static bool
-CreateArray(JSContext* cx)
-{
+static bool CreateArray(JSContext* cx) {
   JS::RootedObject x(cx, JS_NewArrayObject(cx, 0));
-  if (!x)
-    return false;
+  if (!x) return false;
 
   return true;
 }
@@ -192,17 +175,13 @@ CreateArray(JSContext* cx)
 /* // JavaScript
  * var x = {};  // or "x = Object()", or "x = new Object"
  */
-static bool
-CreateObject(JSContext* cx)
-{
+static bool CreateObject(JSContext* cx) {
   JS::RootedObject x(cx, JS_NewPlainObject(cx));
-  if (!x)
-    return false;
+  if (!x) return false;
 
   // or:
   x = JS_NewObject(cx, /* clasp = */ nullptr);
-  if (!x)
-    return false;
+  if (!x) return false;
 
   return true;
 }
@@ -219,13 +198,10 @@ CreateObject(JSContext* cx)
  * - prepare the arguments ("Dave", 24)
  * - call JS_New to simulate the new keyword
  */
-static bool
-ConstructObjectWithNew(JSContext* cx, JS::HandleObject global)
-{
+static bool ConstructObjectWithNew(JSContext* cx, JS::HandleObject global) {
   // Step 1 - Get the value of `Person` and check that it is an object.
   JS::RootedValue constructor_val(cx);
-  if (!JS_GetProperty(cx, global, "Person", &constructor_val))
-    return false;
+  if (!JS_GetProperty(cx, global, "Person", &constructor_val)) return false;
   if (!constructor_val.isObject()) {
     JS_ReportErrorASCII(cx, "Person is not a constructor");
     return false;
@@ -234,8 +210,7 @@ ConstructObjectWithNew(JSContext* cx, JS::HandleObject global)
 
   // Step 2 - Set up the arguments.
   JS::RootedString name_str(cx, JS_NewStringCopyZ(cx, "Dave"));
-  if (!name_str)
-    return false;
+  if (!name_str) return false;
 
   JS::AutoValueArray<2> args(cx);
   args[0].setString(name_str);
@@ -243,25 +218,20 @@ ConstructObjectWithNew(JSContext* cx, JS::HandleObject global)
 
   // Step 3 - Call `new Person(...args)`, passing the arguments.
   JS::RootedObject obj(cx, JS_New(cx, constructor, args));
-  if (!obj)
-    return false;
+  if (!obj) return false;
 
   // (If your constructor doesn't take any arguments, you can skip the second
   // step and call step 3 like this:)
   obj = JS_New(cx, constructor, JS::HandleValueArray::empty());
-  if (!obj)
-    return false;
+  if (!obj) return false;
 
   return true;
 }
 
-static bool
-PersonConstructor(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool PersonConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JS::RootedObject newObject(cx, JS_NewPlainObject(cx));
-  if (!newObject)
-    return false;
+  if (!newObject) return false;
   args.rval().setObject(*newObject);
   return true;
 }
@@ -274,12 +244,10 @@ PersonConstructor(JSContext* cx, unsigned argc, JS::Value* vp)
  * Suppose the script defines a global JavaScript
  * function foo() and we want to call it from C.
  */
-static bool
-CallGlobalFunction(JSContext* cx, JS::HandleObject global)
-{
+static bool CallGlobalFunction(JSContext* cx, JS::HandleObject global) {
   JS::RootedValue r(cx);
-  if (!JS_CallFunctionName(
-        cx, global, "foo", JS::HandleValueArray::empty(), &r)) {
+  if (!JS_CallFunctionName(cx, global, "foo", JS::HandleValueArray::empty(),
+                           &r)) {
     return false;
   }
 
@@ -293,9 +261,7 @@ CallGlobalFunction(JSContext* cx, JS::HandleObject global)
  *
  * Suppose f is a local C variable of type JS::Value.
  */
-static bool
-CallLocalFunctionVariable(JSContext* cx, JS::HandleValue f)
-{
+static bool CallLocalFunctionVariable(JSContext* cx, JS::HandleValue f) {
   JS::RootedValue r(cx);
   if (!JS_CallFunctionValue(cx, nullptr, f, JS::HandleValueArray::empty(), &r))
     return false;
@@ -311,9 +277,7 @@ CallLocalFunctionVariable(JSContext* cx, JS::HandleValue f)
  * Warning: This only works for integers that fit in 32 bits.
  * Otherwise, use setNumber or setDouble (see the next example).
  */
-static bool
-ReturnInteger(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool ReturnInteger(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setInt32(23);
   return true;
@@ -325,9 +289,7 @@ ReturnInteger(JSContext* cx, unsigned argc, JS::Value* vp)
  * return 3.14159;
  */
 
-static bool
-ReturnFloat(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool ReturnFloat(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setDouble(3.14159);
   return true;
@@ -349,9 +311,7 @@ ReturnFloat(JSContext* cx, unsigned argc, JS::Value* vp)
  * as SyntaxError or TypeError, use JS_ReportErrorNumber{ASCII,Latin1,UTF8}
  * instead.
  */
-static bool
-ReportError(JSContext* cx, const char* varietal)
-{
+static bool ReportError(JSContext* cx, const char* varietal) {
   JS_ReportErrorASCII(cx, "Failed to grow %s: too many greenflies.", varietal);
   return false;
 }
@@ -362,9 +322,7 @@ ReportError(JSContext* cx, const char* varietal)
  * // JavaScript
  * throw exc;
  */
-static bool
-ThrowValue(JSContext* cx, JS::HandleValue exc)
-{
+static bool ThrowValue(JSContext* cx, JS::HandleValue exc) {
   JS_SetPendingException(cx, exc);
   return false;
 }
@@ -383,19 +341,13 @@ ThrowValue(JSContext* cx, JS::HandleValue exc)
  *
  * return ThrowError(cx, global, message, __FILE__, __LINE__);
  */
-static bool
-ThrowError(JSContext* cx,
-           JS::HandleObject global,
-           const char* message,
-           const char* filename,
-           int32_t lineno)
-{
+static bool ThrowError(JSContext* cx, JS::HandleObject global,
+                       const char* message, const char* filename,
+                       int32_t lineno) {
   JS::RootedString messageStr(cx, JS_NewStringCopyZ(cx, message));
-  if (!messageStr)
-    return false;
+  if (!messageStr) return false;
   JS::RootedString filenameStr(cx, JS_NewStringCopyZ(cx, filename));
-  if (!filenameStr)
-    return false;
+  if (!filenameStr) return false;
 
   JS::AutoValueArray<3> args(cx);
   args[0].setString(messageStr);
@@ -405,14 +357,13 @@ ThrowError(JSContext* cx,
   // The JSAPI code here is actually simulating `throw Error(message)` without
   // the new, as new is a bit harder to simulate using the JSAPI. In this case,
   // unless the script has redefined Error, it amounts to the same thing.
-  if (!JS_CallFunctionName(cx, global, "Error", args, &exc))
-    return false;
+  if (!JS_CallFunctionName(cx, global, "Error", args, &exc)) return false;
 
   JS_SetPendingException(cx, exc);
   return false;
 }
 
-#define THROW_ERROR(cx, global, message)                                       \
+#define THROW_ERROR(cx, global, message) \
   ThrowError(cx, global, message, __FILE__, __LINE__)
 
 ///// `catch` //////////////////////////////////////////////////////////////////
@@ -426,23 +377,20 @@ ThrowError(JSContext* cx,
  *     // do error-handling stuff here
  * }
  */
-static bool
-CatchError(JSContext* cx, JS::HandleObject global)
-{
+static bool CatchError(JSContext* cx, JS::HandleObject global) {
   JS::RootedValue r(cx);
   // try some stuff here; for example:
-  if (!JS_CallFunctionName(
-        cx, global, "foo", JS::HandleValueArray::empty(), &r))
-    goto catch_block; // instead of returning false
-  if (!JS_CallFunctionName(
-        cx, global, "bar", JS::HandleValueArray::empty(), &r))
-    goto catch_block; // instead of returning false
+  if (!JS_CallFunctionName(cx, global, "foo", JS::HandleValueArray::empty(),
+                           &r))
+    goto catch_block;  // instead of returning false
+  if (!JS_CallFunctionName(cx, global, "bar", JS::HandleValueArray::empty(),
+                           &r))
+    goto catch_block;  // instead of returning false
   return true;
 
 catch_block:
   JS::RootedValue exc(cx);
-  if (!JS_GetPendingException(cx, &exc))
-    return false;
+  if (!JS_GetPendingException(cx, &exc)) return false;
   JS_ClearPendingException(cx);
   // do error-handling stuff here
   return true;
@@ -461,17 +409,15 @@ catch_block:
  * If your C/C++ cleanup code doesn't call back into the JSAPI, this is
  * straightforward:
  */
-static bool
-FinallyBlock(JSContext* cx, JS::HandleObject global)
-{
+static bool FinallyBlock(JSContext* cx, JS::HandleObject global) {
   bool success = false;
   JS::RootedValue r(cx);
 
-  if (!JS_CallFunctionName(
-        cx, global, "foo", JS::HandleValueArray::empty(), &r))
-    goto finally_block; // instead of returning false immediately
-  if (!JS_CallFunctionName(
-        cx, global, "bar", JS::HandleValueArray::empty(), &r))
+  if (!JS_CallFunctionName(cx, global, "foo", JS::HandleValueArray::empty(),
+                           &r))
+    goto finally_block;  // instead of returning false immediately
+  if (!JS_CallFunctionName(cx, global, "bar", JS::HandleValueArray::empty(),
+                           &r))
     goto finally_block;
   success = true;
   // Intentionally fall through to the finally block.
@@ -494,17 +440,15 @@ finally_block:
  * - return false if an exception occurred, so that the exception is propagated
  *   up.
  */
-static bool
-ReentrantFinallyBlock(JSContext* cx, JS::HandleObject global)
-{
+static bool ReentrantFinallyBlock(JSContext* cx, JS::HandleObject global) {
   bool success = false;
   JS::RootedValue r(cx);
 
-  if (!JS_CallFunctionName(
-        cx, global, "foo", JS::HandleValueArray::empty(), &r))
-    goto finally_block; // instead of returning false immediately
-  if (!JS_CallFunctionName(
-        cx, global, "bar", JS::HandleValueArray::empty(), &r))
+  if (!JS_CallFunctionName(cx, global, "foo", JS::HandleValueArray::empty(),
+                           &r))
+    goto finally_block;  // instead of returning false immediately
+  if (!JS_CallFunctionName(cx, global, "bar", JS::HandleValueArray::empty(),
+                           &r))
     goto finally_block;
   success = true;
   // Intentionally fall through to the finally block.
@@ -515,8 +459,8 @@ finally_block:
    * savedState.drop(). */
   JS::AutoSaveExceptionState savedState(cx);
 
-  if (!JS_CallFunctionName(
-        cx, global, "cleanup", JS::HandleValueArray::empty(), &r)) {
+  if (!JS_CallFunctionName(cx, global, "cleanup", JS::HandleValueArray::empty(),
+                           &r)) {
     // The new error replaces the previous one, so discard the saved exception
     // state.
     savedState.drop();
@@ -540,15 +484,12 @@ finally_block:
  * number, string, null, or undefined), this is fairly straightforward. Use
  * JS::Value::toObject() to cast y to type JSObject*.
  */
-static bool
-GetProperty(JSContext* cx, JS::HandleValue y)
-{
+static bool GetProperty(JSContext* cx, JS::HandleValue y) {
   JS::RootedValue x(cx);
 
   assert(y.isObject());
   JS::RootedObject yobj(cx, &y.toObject());
-  if (!JS_GetProperty(cx, yobj, "myprop", &x))
-    return false;
+  if (!JS_GetProperty(cx, yobj, "myprop", &x)) return false;
 
   return true;
 }
@@ -558,16 +499,13 @@ GetProperty(JSContext* cx, JS::HandleValue y)
  * which will "work" but tends to silently hide errors (as for example would
  * JavaScript `var x = 4; return x.myprop;`).
  */
-static bool
-GetPropertySafe(JSContext* cx, JS::HandleObject global, JS::HandleValue y)
-{
+static bool GetPropertySafe(JSContext* cx, JS::HandleObject global,
+                            JS::HandleValue y) {
   JS::RootedObject yobj(cx);
-  if (!JS_ValueToObject(cx, y, &yobj))
-    return false;
+  if (!JS_ValueToObject(cx, y, &yobj)) return false;
 
   JS::RootedValue x(cx);
-  if (!JS_GetProperty(cx, yobj, "myprop", &x))
-    return false;
+  if (!JS_GetProperty(cx, yobj, "myprop", &x)) return false;
 
   return true;
 }
@@ -580,14 +518,10 @@ GetPropertySafe(JSContext* cx, JS::HandleObject global, JS::HandleValue y)
  * See "Getting a property", above, concerning the case where y is not an
  * object.
  */
-static bool
-SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
-{
+static bool SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x) {
   JS::RootedObject yobj(cx);
-  if (!JS_ValueToObject(cx, y, &yobj))
-    return false;
-  if (!JS_SetProperty(cx, yobj, "myprop", x))
-    return false;
+  if (!JS_ValueToObject(cx, y, &yobj)) return false;
+  if (!JS_SetProperty(cx, yobj, "myprop", x)) return false;
 
   return true;
 }
@@ -602,17 +536,14 @@ SetProperty(JSContext* cx, JS::HandleValue y, JS::HandleValue x)
  * In the case where y is not an object, here we just proceed as if the property
  * did not exist. Compare "Getting a property", above.
  */
-static bool
-CheckProperty(JSContext* cx, JS::HandleValue y)
-{
+static bool CheckProperty(JSContext* cx, JS::HandleValue y) {
   bool found;
 
   if (!y.isObject()) {
     found = false;
   } else {
     JS::RootedObject yobj(cx, &y.toObject());
-    if (!JS_HasProperty(cx, yobj, "myprop", &found))
-      return false;
+    if (!JS_HasProperty(cx, yobj, "myprop", &found)) return false;
   }
   if (found) {
     // then do something
@@ -647,17 +578,12 @@ CheckProperty(JSContext* cx, JS::HandleValue y)
  * opposite behavior for any of these settings, simply omit the property
  * attribute bits you don't want.
  */
-static bool
-DefineConstantProperty(JSContext* cx, JS::HandleObject obj)
-{
+static bool DefineConstantProperty(JSContext* cx, JS::HandleObject obj) {
   // You can pass the integer directly instead of creating a JS::Int32Value(),
   // as there are overloads for common types
-  if (!JS_DefineProperty(cx,
-                         obj,
-                         "const-prop",
-                         123,
-                         JSPROP_READONLY | JSPROP_ENUMERATE |
-                           JSPROP_PERMANENT)) {
+  if (!JS_DefineProperty(
+          cx, obj, "const-prop", 123,
+          JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT)) {
     return false;
   }
 
@@ -679,29 +605,19 @@ DefineConstantProperty(JSContext* cx, JS::HandleObject obj)
  * In the JSAPI version, GetPropFunc and SetPropFunc are C/C++ functions of type
  * JSNative.
  */
-static bool
-GetPropFunc(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool GetPropFunc(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setInt32(42);
   return true;
 }
 
-static bool
-SetPropFunc(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool SetPropFunc(JSContext* cx, unsigned argc, JS::Value* vp) {
   return true;
 }
 
-static bool
-DefineGetterSetterProperty(JSContext* cx, JS::HandleObject obj)
-{
-  if (!JS_DefineProperty(cx,
-                         obj,
-                         "getter_setter_prop",
-                         GetPropFunc,
-                         SetPropFunc,
-                         JSPROP_ENUMERATE)) {
+static bool DefineGetterSetterProperty(JSContext* cx, JS::HandleObject obj) {
+  if (!JS_DefineProperty(cx, obj, "getter_setter_prop", GetPropFunc,
+                         SetPropFunc, JSPROP_ENUMERATE)) {
     return false;
   }
 
@@ -719,13 +635,8 @@ DefineGetterSetterProperty(JSContext* cx, JS::HandleObject obj)
  * In the JSAPI version, to signify that the property is read-only, pass nullptr
  * for the setter.
  */
-static bool
-DefineReadOnlyProperty(JSContext* cx, JS::HandleObject obj)
-{
-  if (!JS_DefineProperty(cx,
-                         obj,
-                         "read_only_prop",
-                         GetPropFunc,
+static bool DefineReadOnlyProperty(JSContext* cx, JS::HandleObject obj) {
+  if (!JS_DefineProperty(cx, obj, "read_only_prop", GetPropFunc,
                          nullptr, /* setter */
                          JSPROP_ENUMERATE)) {
     return false;
@@ -747,43 +658,32 @@ DefineReadOnlyProperty(JSContext* cx, JS::HandleObject obj)
  * The following trick couldn't work if someone has replaced the global String
  * object with something.
  */
-static bool
-GetMD5Func(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool GetMD5Func(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   // Implement your MD5 hashing here...
   JSString* hashstr = JS_NewStringCopyZ(cx, "d41d8cd98f00b204e9800998ecf8427e");
-  if (!hashstr)
-    return false;
+  if (!hashstr) return false;
   args.rval().setString(hashstr);
   return true;
 }
 
-static bool
-ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
-{
+static bool ModifyStringPrototype(JSContext* cx, JS::HandleObject global) {
   JS::RootedValue val(cx);
 
   // Get the String constructor from the global object.
-  if (!JS_GetProperty(cx, global, "String", &val))
-    return false;
+  if (!JS_GetProperty(cx, global, "String", &val)) return false;
   if (val.isPrimitive())
     return THROW_ERROR(cx, global, "String is not an object");
   JS::RootedObject string(cx, &val.toObject());
 
   // Get String.prototype.
-  if (!JS_GetProperty(cx, string, "prototype", &val))
-    return false;
+  if (!JS_GetProperty(cx, string, "prototype", &val)) return false;
   if (val.isPrimitive())
     return THROW_ERROR(cx, global, "String.prototype is not an object");
   JS::RootedObject string_prototype(cx, &val.toObject());
 
   // ...and now we can add some new functionality to all strings.
-  if (!JS_DefineProperty(cx,
-                         string_prototype,
-                         "md5sum",
-                         GetMD5Func,
-                         nullptr,
+  if (!JS_DefineProperty(cx, string_prototype, "md5sum", GetMD5Func, nullptr,
                          JSPROP_ENUMERATE)) {
     return false;
   }
@@ -826,25 +726,17 @@ ModifyStringPrototype(JSContext* cx, JS::HandleObject global)
  *     static static_method(a, b) { return a + b; }
  * }
  */
-static JSClass myClass = { "MyClass", JSCLASS_HAS_RESERVED_SLOTS(2), nullptr };
+static JSClass myClass = {"MyClass", JSCLASS_HAS_RESERVED_SLOTS(2), nullptr};
 
-enum MyClassSlots
-{
-  SlotA,
-  SlotB
-};
+enum MyClassSlots { SlotA, SlotB };
 
-static bool
-MyClassPropGetter(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool MyClassPropGetter(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setInt32(42);
   return true;
 }
 
-static bool
-MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
 
@@ -852,30 +744,24 @@ MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp)
   JS::RootedValue v_b(cx, JS_GetReservedSlot(thisObj, SlotB));
 
   double a, b;
-  if (!JS::ToNumber(cx, v_a, &a) || !JS::ToNumber(cx, v_b, &b))
-    return false;
+  if (!JS::ToNumber(cx, v_a, &a) || !JS::ToNumber(cx, v_b, &b)) return false;
 
   args.rval().setDouble(a + b);
   return true;
 }
 
-static bool
-MyClassStaticPropGetter(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool MyClassStaticPropGetter(JSContext* cx, unsigned argc,
+                                    JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JSString* str = JS_NewStringCopyZ(cx, "static");
-  if (!str)
-    return false;
+  if (!str) return false;
   args.rval().setString(str);
   return true;
 }
 
-static bool
-MyClassStaticMethod(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool MyClassStaticMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  if (!args.requireAtLeast(cx, "static_method", 2))
-    return false;
+  if (!args.requireAtLeast(cx, "static_method", 2)) return false;
 
   double a, b;
   if (!JS::ToNumber(cx, args[0], &a) || !JS::ToNumber(cx, args[1], &b))
@@ -886,38 +772,28 @@ MyClassStaticMethod(JSContext* cx, unsigned argc, JS::Value* vp)
 }
 
 static JSPropertySpec MyClassProperties[] = {
-  JS_PSG("prop", MyClassPropGetter, JSPROP_ENUMERATE),
-  JS_PS_END
-};
+    JS_PSG("prop", MyClassPropGetter, JSPROP_ENUMERATE), JS_PS_END};
 
 static JSFunctionSpec MyClassMethods[] = {
-  JS_FN("method", MyClassMethod, 0, JSPROP_ENUMERATE),
-  JS_FS_END
-};
+    JS_FN("method", MyClassMethod, 0, JSPROP_ENUMERATE), JS_FS_END};
 
 static JSPropertySpec MyClassStaticProperties[] = {
-  JS_PSG("static_prop", MyClassStaticPropGetter, JSPROP_ENUMERATE),
-  JS_PS_END
-};
+    JS_PSG("static_prop", MyClassStaticPropGetter, JSPROP_ENUMERATE),
+    JS_PS_END};
 
 static JSFunctionSpec MyClassStaticMethods[] = {
-  JS_FN("static_method", MyClassStaticMethod, 2, JSPROP_ENUMERATE),
-  JS_FS_END
-};
+    JS_FN("static_method", MyClassStaticMethod, 2, JSPROP_ENUMERATE),
+    JS_FS_END};
 
-static bool
-MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  if (!args.requireAtLeast(cx, "MyClass", 2))
-    return false;
+  if (!args.requireAtLeast(cx, "MyClass", 2)) return false;
   if (!args.isConstructing()) {
     JS_ReportErrorASCII(cx, "You must call this constructor with 'new'");
     return false;
   }
   JS::RootedObject thisObj(cx, JS_NewObjectForConstructor(cx, &myClass, args));
-  if (!thisObj)
-    return false;
+  if (!thisObj) return false;
 
   // Slightly different from the 'private' properties in the JS example, here
   // we use reserved slots to store the a and b values. These are not accessible
@@ -929,30 +805,20 @@ MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp)
   return true;
 }
 
-static bool
-DefineMyClass(JSContext* cx, JS::HandleObject global)
-{
+static bool DefineMyClass(JSContext* cx, JS::HandleObject global) {
   JS::RootedObject protoObj(
-    cx,
-    JS_InitClass(
-      cx,
-      global,
-      nullptr,
-      &myClass,
-      // native constructor function and min arg count
-      MyClassConstructor,
-      2,
+      cx, JS_InitClass(cx, global, nullptr, &myClass,
+                       // native constructor function and min arg count
+                       MyClassConstructor, 2,
 
-      // prototype object properties and methods -- these will be "inherited" by
-      // all instances through delegation up the instance's prototype link.
-      MyClassProperties,
-      MyClassMethods,
+                       // prototype object properties and methods -- these will
+                       // be "inherited" by all instances through delegation up
+                       // the instance's prototype link.
+                       MyClassProperties, MyClassMethods,
 
-      // class constructor properties and methods
-      MyClassStaticProperties,
-      MyClassStaticMethods));
-  if (!protoObj)
-    return false;
+                       // class constructor properties and methods
+                       MyClassStaticProperties, MyClassStaticMethods));
+  if (!protoObj) return false;
 
   // You can add anything else here to protoObj (which is available as
   // MyClass.prototype in JavaScript). For example, call JS_DefineProperty() to
@@ -972,63 +838,54 @@ DefineMyClass(JSContext* cx, JS::HandleObject global)
 
 /**** BOILERPLATE *************************************************************/
 
-// clang-format off
-static JSClassOps globalOps = { nullptr, nullptr, nullptr, nullptr, nullptr,
-  nullptr, nullptr, nullptr, nullptr, nullptr, JS_GlobalObjectTraceHook };
+static JSClassOps globalOps = {nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               JS_GlobalObjectTraceHook};
 
-static JSClass globalClass = {
-    "CookbookGlobal",
-    JSCLASS_GLOBAL_FLAGS,
-    &globalOps
-};
-// clang-format on
+static JSClass globalClass = {"CookbookGlobal", JSCLASS_GLOBAL_FLAGS,
+                              &globalOps};
 
-static bool
-GenericJSNative(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool GenericJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
   return true;
 }
 
-static bool
-ThrowJSNative(JSContext* cx, unsigned argc, JS::Value* vp)
-{
+static bool ThrowJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
-  if (!global)
-    return false;
+  if (!global) return false;
   return THROW_ERROR(cx, global, "Error message");
 }
 
 static JSFunctionSpec globalFunctions[] = {
-  JS_FN("findGlobalObject", FindGlobalObject, 0, 0),
-  JS_FN("Person", PersonConstructor, 2, JSFUN_CONSTRUCTOR),
-  JS_FN("foo", GenericJSNative, 0, 0),
-  JS_FN("returnInteger", ReturnInteger, 0, 0),
-  JS_FN("returnFloat", ReturnFloat, 0, 0),
-  JS_FN("bar", ThrowJSNative, 0, 0),
-  JS_FN("cleanup", GenericJSNative, 0, 0),
-  JS_FS_END
-};
+    JS_FN("findGlobalObject", FindGlobalObject, 0, 0),
+    JS_FN("Person", PersonConstructor, 2, JSFUN_CONSTRUCTOR),
+    JS_FN("foo", GenericJSNative, 0, 0),
+    JS_FN("returnInteger", ReturnInteger, 0, 0),
+    JS_FN("returnFloat", ReturnFloat, 0, 0),
+    JS_FN("bar", ThrowJSNative, 0, 0),
+    JS_FN("cleanup", GenericJSNative, 0, 0),
+    JS_FS_END};
 
-static JSContext*
-CreateContext(void)
-{
+static JSContext* CreateContext(void) {
   JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx)
-    return nullptr;
-  if (!JS::InitSelfHostedCode(cx))
-    return nullptr;
+  if (!cx) return nullptr;
+  if (!JS::InitSelfHostedCode(cx)) return nullptr;
   return cx;
 }
 
-static JSObject*
-CreateGlobal(JSContext* cx)
-{
+static JSObject* CreateGlobal(JSContext* cx) {
   JS::CompartmentOptions options;
   JS::RootedObject global(
-    cx,
-    JS_NewGlobalObject(
-      cx, &globalClass, nullptr, JS::FireOnNewGlobalHook, options));
+      cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook,
+                             options));
 
   JSAutoCompartment ac(cx, global);
   if (!JS_InitStandardClasses(cx, global) ||
@@ -1039,28 +896,21 @@ CreateGlobal(JSContext* cx)
   return global;
 }
 
-static bool
-ExecuteCode(JSContext* cx, const char* code)
-{
+static bool ExecuteCode(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
   JS::RootedValue unused(cx);
   return JS::Evaluate(cx, options, code, strlen(code), &unused);
 }
 
-class AutoReportException
-{
+class AutoReportException {
   JSContext* m_cx;
 
-public:
-  explicit AutoReportException(JSContext* cx)
-    : m_cx(cx)
-  {}
+ public:
+  explicit AutoReportException(JSContext* cx) : m_cx(cx) {}
 
-  ~AutoReportException(void)
-  {
-    if (!JS_IsExceptionPending(m_cx))
-      return;
+  ~AutoReportException(void) {
+    if (!JS_IsExceptionPending(m_cx)) return;
 
     JS::RootedValue v_exn(m_cx);
     mozilla::Unused << JS_GetPendingException(m_cx, &v_exn);
@@ -1080,14 +930,11 @@ public:
 
 /* Execute each of the examples; many don't do anything but it's good to be able
  * to exercise the code to make sure it hasn't bitrotted. */
-static bool
-Run(JSContext* cx)
-{
+static bool Run(JSContext* cx) {
   JSAutoRequest ar(cx);
 
   JS::RootedObject global(cx, CreateGlobal(cx));
-  if (!global)
-    return false;
+  if (!global) return false;
 
   JSAutoCompartment ac(cx, global);
   AutoReportException autoreport(cx);
@@ -1096,8 +943,7 @@ Run(JSContext* cx)
 
   JS::RootedValue v(cx, JS::NullValue());
   GetTypeOfValue(cx, v);
-  if (!SetValue(cx))
-    return false;
+  if (!SetValue(cx)) return false;
 
   if (!DefineGlobalFunction(cx, global) || !CreateArray(cx) ||
       !CreateObject(cx) || !ConstructObjectWithNew(cx, global) ||
@@ -1107,61 +953,43 @@ Run(JSContext* cx)
 
   JS::RootedValue f(cx);
   JSFunction* newFunction = JS_NewFunction(cx, JustForFun, 0, 0, "f");
-  if (!newFunction)
-    return false;
+  if (!newFunction) return false;
   f.setObject(*JS_GetFunctionObject(newFunction));
 
-  if (!CallLocalFunctionVariable(cx, f))
-    return false;
+  if (!CallLocalFunctionVariable(cx, f)) return false;
 
-  if (ReportError(cx, "cabernet sauvignon"))
-    return false;
+  if (ReportError(cx, "cabernet sauvignon")) return false;
   JS_ClearPendingException(cx);
 
   JS::RootedValue exc(cx, JS::NumberValue(42));
-  if (ThrowValue(cx, exc))
-    return false;
+  if (ThrowValue(cx, exc)) return false;
   JS_ClearPendingException(cx);
 
-  if (THROW_ERROR(cx, global, "an error message"))
-    return false;
+  if (THROW_ERROR(cx, global, "an error message")) return false;
   JS_ClearPendingException(cx);
 
-  if (!CatchError(cx, global))
-    return false;
+  if (!CatchError(cx, global)) return false;
 
-  if (FinallyBlock(cx, global))
-    return false;
+  if (FinallyBlock(cx, global)) return false;
   JS_ClearPendingException(cx);
 
-  if (ReentrantFinallyBlock(cx, global))
-    return false;
+  if (ReentrantFinallyBlock(cx, global)) return false;
   JS_ClearPendingException(cx);
 
   JS::RootedObject obj(cx, JS_NewPlainObject(cx));
-  if (!obj)
-    return false;
+  if (!obj) return false;
   JS::RootedValue v_obj(cx, JS::ObjectValue(*obj));
   JS::RootedValue v_prop(cx, JS::Int32Value(42));
-  if (!SetProperty(cx, v_obj, v_prop))
-    return false;
-  if (!CheckProperty(cx, v_obj))
-    return false;
-  if (!GetProperty(cx, v_obj))
-    return false;
-  if (!GetPropertySafe(cx, global, v_obj))
-    return false;
-  if (!DefineConstantProperty(cx, obj))
-    return false;
-  if (!DefineGetterSetterProperty(cx, obj))
-    return false;
-  if (!DefineReadOnlyProperty(cx, obj))
-    return false;
-  if (!ModifyStringPrototype(cx, global))
-    return false;
+  if (!SetProperty(cx, v_obj, v_prop)) return false;
+  if (!CheckProperty(cx, v_obj)) return false;
+  if (!GetProperty(cx, v_obj)) return false;
+  if (!GetPropertySafe(cx, global, v_obj)) return false;
+  if (!DefineConstantProperty(cx, obj)) return false;
+  if (!DefineGetterSetterProperty(cx, obj)) return false;
+  if (!DefineReadOnlyProperty(cx, obj)) return false;
+  if (!ModifyStringPrototype(cx, global)) return false;
 
-  if (!DefineMyClass(cx, global))
-    return false;
+  if (!DefineMyClass(cx, global)) return false;
   if (!ExecuteCode(cx, R"js(
         const m = new MyClass(1, 2);
         m.method();
@@ -1181,15 +1009,11 @@ Run(JSContext* cx)
   )js");
 }
 
-int
-main(int argc, const char* argv[])
-{
-  if (!JS_Init())
-    return 1;
+int main(int argc, const char* argv[]) {
+  if (!JS_Init()) return 1;
 
   JSContext* cx = CreateContext();
-  if (!cx)
-    return 1;
+  if (!cx) return 1;
 
   bool retcode = Run(cx) ? 0 : 1;
 
