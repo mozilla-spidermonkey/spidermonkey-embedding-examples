@@ -66,4 +66,4 @@ add_project_arguments(cxx.get_supported_arguments(test_warning_args),
 
 executable('hello', 'examples/hello.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
 executable('cookbook', 'examples/cookbook.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
-executable('repl', 'examples/repl.cpp', dependencies: [spidermonkey, readline])
+executable('repl', 'examples/repl.cpp', 'examples/boilerplate.cpp', dependencies: [spidermonkey, readline])

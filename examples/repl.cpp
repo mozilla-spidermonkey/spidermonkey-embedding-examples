@@ -1,16 +1,22 @@
 #include <cassert>
 #include <codecvt>
 #include <iostream>
+#include <locale>
 #include <sstream>
 #include <string>
 
-#include <js/Conversions.h>
-#include <js/Initialization.h>
 #include <jsapi.h>
 #include <jsfriendapi.h>
+
 #include <mozilla/Unused.h>
+
+#include <js/Conversions.h>
+#include <js/Initialization.h>
+
 #include <readline/history.h>
 #include <readline/readline.h>
+
+#include "boilerplate.h"
 
 /* This is a longer example that illustrates how to build a simple
  * REPL (Read-Eval-Print Loop). */
@@ -43,22 +49,10 @@ class ReplGlobal {
     return false;
   }
 
-  static constexpr JSClassOps classOps = {nullptr,  // addProperty
-                                          nullptr,  // deleteProperty
-                                          nullptr,  // enumerate
-                                          nullptr,  // newEnumerate
-                                          nullptr,  // resolve
-                                          nullptr,  // mayResolve
-                                          nullptr,  // finalize
-                                          nullptr,  // call
-                                          nullptr,  // hasInstance
-                                          nullptr,  // construct
-                                          JS_GlobalObjectTraceHook};
-
   /* The class of the global object. */
   static constexpr JSClass klass = {"ReplGlobal",
                                     JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
-                                    &ReplGlobal::classOps};
+                                    &boilerplate::DefaultGlobalClassOps};
 
   static constexpr JSFunctionSpec functions[] = {
       JS_FN("quit", &ReplGlobal::quit, 0, 0), JS_FS_END};
@@ -67,7 +61,6 @@ class ReplGlobal {
   static JSObject* create(JSContext* cx);
   static void loop(JSContext* cx, JS::HandleObject global);
 };
-constexpr JSClassOps ReplGlobal::classOps;
 constexpr JSClass ReplGlobal::klass;
 constexpr JSFunctionSpec ReplGlobal::functions[];
 
@@ -261,22 +254,6 @@ static void ReportAndClearException(JSContext* cx) {
   PrintError(report);
 }
 
-static JSContext* CreateContext(void) {
-  JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx) return nullptr;
-
-  // This is so that we can use Promises in the REPL, which will be resolved
-  // after each line of input is processed. A more sophisticated embedding might
-  // have its own task scheduling, in which case you would use
-  // JS::SetEnqueuePromiseJobCallback(), JS::SetGetIncumbentGlobalCallback(),
-  // and JS::SetPromiseRejectionTrackerCallback().
-  if (!js::UseInternalJobQueues(cx)) return nullptr;
-
-  if (!JS::InitSelfHostedCode(cx)) return nullptr;
-
-  return cx;
-}
-
 JSObject* ReplGlobal::create(JSContext* cx) {
   JS::CompartmentOptions options;
   JS::RootedObject global(cx,
@@ -286,12 +263,8 @@ JSObject* ReplGlobal::create(JSContext* cx) {
   ReplGlobal* priv = new ReplGlobal();
   JS_SetPrivate(global, priv);
 
-  // Add standard JavaScript classes to the global so we have a useful
-  // environment.
-  JSAutoCompartment ac(cx, global);
-  if (!JS_InitStandardClasses(cx, global)) return nullptr;
-
   // Define any extra global functions that we want in our environment.
+  JSAutoCompartment ac(cx, global);
   if (!JS_DefineFunctions(cx, global, ReplGlobal::functions)) return nullptr;
 
   return global;
@@ -346,7 +319,18 @@ void ReplGlobal::loop(JSContext* cx, JS::HandleObject global) {
   } while (!eof && !priv(global)->m_shouldQuit);
 }
 
-static bool Run(JSContext* cx) {
+static bool RunREPL(JSContext* cx) {
+  // In order to use Promises in the REPL, we need a job queue to process
+  // events after each line of input is processed.
+  //
+  // A more sophisticated embedding would schedule it's own tasks and use
+  // JS::SetEnqueuePromiseJobCallback(), JS::SetGetIncumbentGlobalCallback(),
+  // and JS::SetPromiseRejectionTrackerCallback().
+  if (!js::UseInternalJobQueues(cx)) return false;
+
+  // We must instantiate self-hosting *after* setting up job queue.
+  if (!JS::InitSelfHostedCode(cx)) return false;
+
   JSAutoRequest ar(cx);
 
   JS::RootedObject global(cx, ReplGlobal::create(cx));
@@ -364,14 +348,7 @@ static bool Run(JSContext* cx) {
 }
 
 int main(int argc, const char* argv[]) {
-  if (!JS_Init()) die("Could not initialize JavaScript engine.");
-
-  JSContext* cx = CreateContext();
-  if (!cx) die("Could not set up interpreter context.");
-
-  if (!Run(cx)) return 1;
-
-  JS_DestroyContext(cx);
-  JS_ShutDown();
+  if (!boilerplate::RunExample(RunREPL, /* initSelfHosting = */ false))
+    return 1;
   return 0;
 }
