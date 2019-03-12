@@ -1,10 +1,13 @@
 #include <iostream>
 #include <limits>
 
-#include <js/Conversions.h>
-#include <js/Initialization.h>
 #include <jsapi.h>
 #include <jsfriendapi.h>
+
+#include <js/Conversions.h>
+#include <js/Initialization.h>
+
+#include "boilerplate.h"
 
 namespace zlib {
 #include <zlib.h>
@@ -234,43 +237,6 @@ static const char* testProgram = R"js(
 /**** BOILERPLATE *************************************************************/
 // Below here, the code is very similar to what is found in hello.cpp
 
-static JSClassOps globalOps = {nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               JS_GlobalObjectTraceHook};
-
-// The class of the global object.
-static JSClass globalClass = {"ResolveGlobal", JSCLASS_GLOBAL_FLAGS,
-                              &globalOps};
-
-static JSContext* CreateContext(void) {
-  JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx) return nullptr;
-  if (!JS::InitSelfHostedCode(cx)) return nullptr;
-  return cx;
-}
-
-static JSObject* CreateGlobal(JSContext* cx) {
-  JS::CompartmentOptions options;
-  JS::RootedObject global(
-      cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook,
-                             options));
-
-  // Add standard JavaScript classes to the global so we have a useful
-  // environment.
-  JSAutoCompartment ac(cx, global);
-  if (!JS_InitStandardClasses(cx, global)) return nullptr;
-
-  return global;
-}
-
 static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
@@ -302,18 +268,22 @@ void LogException(JSContext* cx) {
   std::cout << "Exception thrown: " << JS_EncodeString(cx, exc_str) << '\n';
 }
 
-static bool Run(JSContext* cx) {
+static bool ResolveExample(JSContext* cx) {
   JSAutoRequest ar(cx);
 
-  JS::RootedObject global(cx, CreateGlobal(cx));
+  JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) {
-    LogException(cx);
     return false;
   }
 
   JSAutoCompartment ac(cx, global);
 
-  if (!Crc::DefinePrototype(cx) || !ExecuteCodePrintResult(cx, testProgram)) {
+  if (!Crc::DefinePrototype(cx)) {
+    LogException(cx);
+    return false;
+  }
+
+  if (!ExecuteCodePrintResult(cx, testProgram)) {
     LogException(cx);
     return false;
   }
@@ -322,14 +292,6 @@ static bool Run(JSContext* cx) {
 }
 
 int main(int argc, const char* argv[]) {
-  if (!JS_Init()) die("Could not initialize JavaScript engine");
-
-  JSContext* cx = CreateContext();
-  if (!cx) die("Could not set up JavaScript context");
-
-  if (!Run(cx)) return 1;
-
-  JS_DestroyContext(cx);
-  JS_ShutDown();
+  if (!boilerplate::RunExample(ResolveExample)) return 1;
   return 0;
 }
