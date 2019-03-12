@@ -1,12 +1,17 @@
+#include <cassert>
 #include <iostream>
+
+#include <jsapi.h>
+
+#include <mozilla/Unused.h>
 
 #include <js/Conversions.h>
 #include <js/Initialization.h>
-#include <jsapi.h>
-#include <mozilla/Unused.h>
 
-/* This example program shows the SpiderMonkey JSAPI equivalent for a handful of
- *common JavaScript idioms. */
+#include "boilerplate.h"
+
+// This example program shows the SpiderMonkey JSAPI equivalent for a handful
+// of common JavaScript idioms.
 
 /**** BASICS ******************************************************************/
 
@@ -838,21 +843,6 @@ static bool DefineMyClass(JSContext* cx, JS::HandleObject global) {
 
 /**** BOILERPLATE *************************************************************/
 
-static JSClassOps globalOps = {nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               JS_GlobalObjectTraceHook};
-
-static JSClass globalClass = {"CookbookGlobal", JSCLASS_GLOBAL_FLAGS,
-                              &globalOps};
-
 static bool GenericJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
   return true;
 }
@@ -873,28 +863,6 @@ static JSFunctionSpec globalFunctions[] = {
     JS_FN("bar", ThrowJSNative, 0, 0),
     JS_FN("cleanup", GenericJSNative, 0, 0),
     JS_FS_END};
-
-static JSContext* CreateContext(void) {
-  JSContext* cx = JS_NewContext(8L * 1024 * 1024);
-  if (!cx) return nullptr;
-  if (!JS::InitSelfHostedCode(cx)) return nullptr;
-  return cx;
-}
-
-static JSObject* CreateGlobal(JSContext* cx) {
-  JS::CompartmentOptions options;
-  JS::RootedObject global(
-      cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook,
-                             options));
-
-  JSAutoCompartment ac(cx, global);
-  if (!JS_InitStandardClasses(cx, global) ||
-      !JS_DefineFunctions(cx, global, globalFunctions)) {
-    return nullptr;
-  }
-
-  return global;
-}
 
 static bool ExecuteCode(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
@@ -930,13 +898,17 @@ class AutoReportException {
 
 /* Execute each of the examples; many don't do anything but it's good to be able
  * to exercise the code to make sure it hasn't bitrotted. */
-static bool Run(JSContext* cx) {
+static bool RunCookbook(JSContext* cx) {
   JSAutoRequest ar(cx);
 
-  JS::RootedObject global(cx, CreateGlobal(cx));
+  JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) return false;
 
   JSAutoCompartment ac(cx, global);
+
+  // Define some helper methods on our new global.
+  if (!JS_DefineFunctions(cx, global, globalFunctions)) return false;
+
   AutoReportException autoreport(cx);
 
   // Execute each of the JSAPI recipe functions we defined:
@@ -1010,14 +982,6 @@ static bool Run(JSContext* cx) {
 }
 
 int main(int argc, const char* argv[]) {
-  if (!JS_Init()) return 1;
-
-  JSContext* cx = CreateContext();
-  if (!cx) return 1;
-
-  bool retcode = Run(cx) ? 0 : 1;
-
-  JS_DestroyContext(cx);
-  JS_ShutDown();
-  return retcode;
+  if (!boilerplate::RunExample(RunCookbook)) return 1;
+  return 0;
 }
