@@ -45,6 +45,8 @@ in the `meson.build` file, and add a description of it to this
 
 - **hello.cpp** - Simple Hello World program, shows how to do the bare
   minimum to embed SpiderMonkey and execute a single line of JS code.
+- **tracing.cpp** - Example of how to safely store pointers to
+  garbage-collected things into your C++ data structures.
 - **cookbook.cpp** - Based on an old wiki page called "JSAPI Cookbook",
   this program doesn't do anything in particular but contains a lot of
   examples showing how to do common operations with SpiderMonkey.
