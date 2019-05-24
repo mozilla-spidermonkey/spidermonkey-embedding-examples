@@ -96,3 +96,17 @@ string is always clear.
 - Where possible, change any of your internal APIs where the return
   value of `JS_EncodeString()` was returned, to also return a smart
   pointer.
+
+### Headers ###
+
+There are now more optional headers which should be included separately
+in code which uses their functionality.
+This is a list of common ones that might be used by embeddings, but in
+general if you are missing function definitions when compiling your
+code, try checking if you might have to include another header.
+
+- `JS::Compile()`, `JS::Evaluate()`, and similar functions —
+  `<js/CompilationAndEvaluation.h>`
+- `JS::ContextOptions` — `<js/ContextOptions.h>`
+- `JS::WarnUTF8()` and similar functions, and `JS::SetWarningReporter()`
+  — `<js/Warnings.h>`

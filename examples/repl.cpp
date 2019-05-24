@@ -14,6 +14,7 @@
 #include <js/Conversions.h>
 #include <js/Initialization.h>
 #include <js/SourceText.h>
+#include <js/Warnings.h>
 
 #include <readline/history.h>
 #include <readline/readline.h>
