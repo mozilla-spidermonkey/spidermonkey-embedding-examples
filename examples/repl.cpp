@@ -55,7 +55,7 @@ class ReplGlobal {
   /* The class of the global object. */
   static constexpr JSClass klass = {"ReplGlobal",
                                     JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
-                                    &boilerplate::DefaultGlobalClassOps};
+                                    &JS::DefaultGlobalClassOps};
 
   static constexpr JSFunctionSpec functions[] = {
       JS_FN("quit", &ReplGlobal::quit, 0, 0), JS_FS_END};
