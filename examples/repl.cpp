@@ -40,7 +40,7 @@ class ReplGlobal {
 
   static bool quit(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+    JS::RootedObject global(cx, JS::GetNonCCWObjectGlobal(&args.callee()));
     if (!global) return false;
 
     // Return an "uncatchable" exception, by returning false without setting an

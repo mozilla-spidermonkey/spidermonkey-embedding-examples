@@ -123,7 +123,7 @@ static bool SetValue(JSContext* cx) {
  */
 static bool FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+  JS::RootedObject global(cx, JS::GetNonCCWObjectGlobal(&args.callee()));
   if (!global) return false;
 
   // For comparison, here's how to do it with JS::CurrentGlobalOrNull():
@@ -851,7 +851,7 @@ static bool GenericJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool ThrowJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+  JS::RootedObject global(cx, JS::GetNonCCWObjectGlobal(&args.callee()));
   if (!global) return false;
   return THROW_ERROR(cx, global, "Error message");
 }
