@@ -12,7 +12,7 @@ also usually available through a package manager.
 The package will usually be called something like `autoconf2.13` rather
 than just `autoconf`.
 
-> **NOTE** SpiderMonkey also requires ICU of at least version 59.1, but
+> **NOTE** SpiderMonkey also requires ICU of at least version 63.1, but
 > it will build a bundled copy by default.
 > If you have a new enough copy installed on your system, you can add
 > `--with-system-icu` in the build instructions below, for a shorter
@@ -48,8 +48,9 @@ writable to you without superuser permissions, for example.
 cd js/src
 mkdir _build
 cd _build
-../configure --disable-jemalloc  --enable-posix-nspr-emulation \
-    --with-system-zlib --with-intl-api --enable-debug --enable-optimize
+../configure --disable-jemalloc --enable-posix-nspr-emulation \
+    --enable-unaligned-private-values --with-system-zlib \
+    --with-intl-api --enable-debug --enable-optimize
 make
 make install  # sudo if necessary
 ```
