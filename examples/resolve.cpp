@@ -254,7 +254,9 @@ static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::RootedString rval_str(cx, JS::ToString(cx, rval));
   if (!rval_str) return false;
 
-  std::cout << JS_EncodeString(cx, rval_str) << '\n';
+  // The printed value will be a number, so we know it will be an ASCII string
+  // that we can just print directly.
+  std::cout << JS_EncodeStringToASCII(cx, rval_str).get() << '\n';
   return true;
 }
 
@@ -273,7 +275,8 @@ void LogException(JSContext* cx) {
   JS::RootedString exc_str(cx, JS::ToString(cx, exception));
   if (!exc_str) die("Exception thrown, could not be converted to string");
 
-  std::cout << "Exception thrown: " << JS_EncodeString(cx, exc_str) << '\n';
+  std::cout << "Exception thrown: " << JS_EncodeStringToUTF8(cx, exc_str).get()
+            << '\n';
 }
 
 static bool ResolveExample(JSContext* cx) {

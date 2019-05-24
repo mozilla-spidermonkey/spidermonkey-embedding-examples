@@ -78,3 +78,21 @@ of the source text memory.
   (None of these examples currently use source hooks.)
 - Your code will need to include `<js/SourceText.h>` for
   `JS::SourceText`.
+
+### String encoding ###
+
+`JS_EncodeString()` has been replaced with `JS_EncodeStringToASCII()`
+and `JS_EncodeStringToUTF8()`, so that the encoding of the returned
+string is always clear.
+
+**Recommendations:**
+- Depending on what you were using `JS_EncodeString()` for, replace it
+  with either the ASCII or UTF8 version.
+  For better performance in cases where you know the string only
+  contains ASCII characters, use the ASCII version, otherwise use the
+  UTF8 version.
+- These functions now return a `JS::UniqueChars` smart pointer, so there
+  is no longer any need to `JS_free()` the return value.
+- Where possible, change any of your internal APIs where the return
+  value of `JS_EncodeString()` was returned, to also return a smart
+  pointer.

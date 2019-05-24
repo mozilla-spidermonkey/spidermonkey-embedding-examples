@@ -30,9 +30,9 @@ static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   if (!JS::Evaluate(cx, options, source, &rval)) return false;
 
   // There are many ways to display an arbitrary value as a result. In this
-  // case, we know that the value is a string because of the expression that we
-  // executed, so we can just print the string directly.
-  printf("%s\n", JS_EncodeString(cx, rval.toString()));
+  // case, we know that the value is an ASCII string because of the expression
+  // that we executed, so we can just print the string directly.
+  printf("%s\n", JS_EncodeStringToASCII(cx, rval.toString()).get());
   return true;
 }
 
