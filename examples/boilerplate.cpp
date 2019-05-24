@@ -26,7 +26,7 @@ const JSClassOps boilerplate::DefaultGlobalClassOps = {
 // Create a simple Global object. A global object is the top-level 'this' value
 // in a script and is required in order to compile or execute JavaScript.
 JSObject* boilerplate::CreateGlobal(JSContext* cx) {
-  JS::CompartmentOptions options;
+  JS::RealmOptions options;
 
   static JSClass BoilerplateGlobalClass = {"BoilerplateGlobal",
                                            JSCLASS_GLOBAL_FLAGS,

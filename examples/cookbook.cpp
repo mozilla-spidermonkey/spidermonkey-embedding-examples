@@ -902,7 +902,7 @@ static bool RunCookbook(JSContext* cx) {
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) return false;
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   // Define some helper methods on our new global.
   if (!JS_DefineFunctions(cx, global, globalFunctions)) return false;

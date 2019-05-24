@@ -12,8 +12,8 @@
 // simple embedding examples.
 //
 // To use the interpreter you need to create a context and a global object, and
-// do some setup on both of these. You also need to enter a "compartment"
-// (environment within one global object) before you can execute code.
+// do some setup on both of these. You also need to enter a "realm" (environment
+// within one global object) before you can execute code.
 
 static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
@@ -36,7 +36,7 @@ static bool HelloExample(JSContext* cx) {
     return false;
   }
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   // The 'js' delimiter is meaningless, but it's useful for marking C++ raw
   // strings semantically.

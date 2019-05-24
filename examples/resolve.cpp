@@ -274,7 +274,7 @@ static bool ResolveExample(JSContext* cx) {
     return false;
   }
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   if (!Crc::DefinePrototype(cx)) {
     LogException(cx);

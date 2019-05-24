@@ -255,7 +255,7 @@ static void ReportAndClearException(JSContext* cx) {
 }
 
 JSObject* ReplGlobal::create(JSContext* cx) {
-  JS::CompartmentOptions options;
+  JS::RealmOptions options;
   JS::RootedObject global(cx,
                           JS_NewGlobalObject(cx, &ReplGlobal::klass, nullptr,
                                              JS::FireOnNewGlobalHook, options));
@@ -264,7 +264,7 @@ JSObject* ReplGlobal::create(JSContext* cx) {
   JS_SetPrivate(global, priv);
 
   // Define any extra global functions that we want in our environment.
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
   if (!JS_DefineFunctions(cx, global, ReplGlobal::functions)) return nullptr;
 
   return global;
@@ -334,7 +334,7 @@ static bool RunREPL(JSContext* cx) {
   JS::RootedObject global(cx, ReplGlobal::create(cx));
   if (!global) return false;
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   JS::SetWarningReporter(
       cx, [](JSContext*, JSErrorReport* report) { PrintError(report); });
