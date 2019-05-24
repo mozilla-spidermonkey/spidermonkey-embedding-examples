@@ -4,8 +4,10 @@
 #include <jsapi.h>
 #include <jsfriendapi.h>
 
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/SourceText.h>
 
 #include "boilerplate.h"
 
@@ -240,8 +242,14 @@ static const char* testProgram = R"js(
 static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
+
+  JS::SourceText<mozilla::Utf8Unit> source;
+  if (!source.init(cx, code, strlen(code), JS::SourceOwnership::Borrowed)) {
+    return false;
+  }
+
   JS::RootedValue rval(cx);
-  if (!JS::Evaluate(cx, options, code, strlen(code), &rval)) return false;
+  if (!JS::Evaluate(cx, options, source, &rval)) return false;
 
   JS::RootedString rval_str(cx, JS::ToString(cx, rval));
   if (!rval_str) return false;

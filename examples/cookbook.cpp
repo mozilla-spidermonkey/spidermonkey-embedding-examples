@@ -5,8 +5,10 @@
 
 #include <mozilla/Unused.h>
 
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/SourceText.h>
 
 #include "boilerplate.h"
 
@@ -867,8 +869,14 @@ static JSFunctionSpec globalFunctions[] = {
 static bool ExecuteCode(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
+
+  JS::SourceText<mozilla::Utf8Unit> source;
+  if (!source.init(cx, code, strlen(code), JS::SourceOwnership::Borrowed)) {
+    return false;
+  }
+
   JS::RootedValue unused(cx);
-  return JS::Evaluate(cx, options, code, strlen(code), &unused);
+  return JS::Evaluate(cx, options, source, &unused);
 }
 
 class AutoReportException {

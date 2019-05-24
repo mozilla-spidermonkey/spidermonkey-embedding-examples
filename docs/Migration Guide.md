@@ -51,3 +51,30 @@ so there is not really an example of when objects need to be wrapped.
   `JS::GetRealmFunctionPrototype()`.)
 - Remove calls to `JS_WrapObject()` where applicable.
 
+### Use UTF8-aware compilation and evaluation ###
+
+In ESR 68, the `JS::Evaluate()` and `JS::Compile()` family of APIs have
+been simplified and made UTF8-aware.
+Instead of C strings of `char*` and `char16_t*`, they now take an
+instance of `JS::SourceText<mozilla::Utf8Unit>` or
+`JS::SourceText<char16_t>`, respectively, which in addition to making
+the text encoding explicit, also carries information about the ownership
+of the source text memory.
+
+**Recommendations:**
+- Create an instance of `JS::SourceText` and put your code in it using
+  its `init()` method.
+  Note that the `init()` method can fail.
+- Pass the `JS::SourceText` instance to `JS::Compile()` or
+  `JS::Evaluate()` instead of a C string and its length.
+- Remove any usage of `JS::CompileOptions::setUTF8()`, which is now made
+  obsolete by the type of `JS::SourceText` passed in.
+- A few other APIs have been renamed for clarity, such as
+  `JS_BufferIsCompilableUnit()` to `JS_UTF8BufferIsCompilableUnit()`.
+- If using a source hook to manage in-memory sources,
+  `js::SourceHook::load()` now has two out parameters for either UTF8
+  source code or wide char source code.
+  Use only one of them.
+  (None of these examples currently use source hooks.)
+- Your code will need to include `<js/SourceText.h>` for
+  `JS::SourceText`.

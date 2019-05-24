@@ -10,8 +10,10 @@
 
 #include <mozilla/Unused.h>
 
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/SourceText.h>
 
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -272,11 +274,16 @@ JSObject* ReplGlobal::create(JSContext* cx) {
 
 bool EvalAndPrint(JSContext* cx, const std::string& buffer, unsigned lineno) {
   JS::CompileOptions options(cx);
-  options.setUTF8(true).setFileAndLine("typein", lineno);
+  options.setFileAndLine("typein", lineno);
+
+  JS::SourceText<mozilla::Utf8Unit> source;
+  if (!source.init(cx, buffer.c_str(), buffer.size(),
+                   JS::SourceOwnership::Borrowed)) {
+    return false;
+  }
 
   JS::RootedValue result(cx);
-  if (!JS::Evaluate(cx, options, buffer.c_str(), buffer.size(), &result))
-    return false;
+  if (!JS::Evaluate(cx, options, source, &result)) return false;
 
   JS_MaybeGC(cx);
 
@@ -308,8 +315,8 @@ void ReplGlobal::loop(JSContext* cx, JS::HandleObject global) {
       if (line[0] != '\0') add_history(line);
       buffer += line;
       lineno++;
-    } while (!JS_BufferIsCompilableUnit(cx, global, buffer.c_str(),
-                                        buffer.length()));
+    } while (!JS_Utf8BufferIsCompilableUnit(cx, global, buffer.c_str(),
+                                            buffer.length()));
 
     if (!EvalAndPrint(cx, buffer, startline)) {
       if (!priv(global)->m_shouldQuit) ReportAndClearException(cx);
