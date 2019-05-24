@@ -269,8 +269,6 @@ void LogException(JSContext* cx) {
 }
 
 static bool ResolveExample(JSContext* cx) {
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) {
     return false;

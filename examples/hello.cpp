@@ -12,9 +12,8 @@
 // simple embedding examples.
 //
 // To use the interpreter you need to create a context and a global object, and
-// do some setup on both of these. You also need to enter a "request" (lock on
-// the interpreter) and a "compartment" (environment within one global object)
-// before you can execute code.
+// do some setup on both of these. You also need to enter a "compartment"
+// (environment within one global object) before you can execute code.
 
 static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
@@ -32,8 +31,6 @@ static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
 }
 
 static bool HelloExample(JSContext* cx) {
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) {
     return false;

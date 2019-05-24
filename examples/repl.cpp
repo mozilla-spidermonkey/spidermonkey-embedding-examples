@@ -331,8 +331,6 @@ static bool RunREPL(JSContext* cx) {
   // We must instantiate self-hosting *after* setting up job queue.
   if (!JS::InitSelfHostedCode(cx)) return false;
 
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, ReplGlobal::create(cx));
   if (!global) return false;
 

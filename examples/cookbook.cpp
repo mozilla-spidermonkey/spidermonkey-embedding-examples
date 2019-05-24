@@ -899,8 +899,6 @@ class AutoReportException {
 /* Execute each of the examples; many don't do anything but it's good to be able
  * to exercise the code to make sure it hasn't bitrotted. */
 static bool RunCookbook(JSContext* cx) {
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) return false;
 
