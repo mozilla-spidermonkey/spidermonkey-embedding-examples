@@ -745,7 +745,8 @@ static bool MyClassPropGetter(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+  JS::RootedObject thisObj(cx);
+  if (!args.computeThis(cx, &thisObj)) return false;
 
   JS::RootedValue v_a(cx, JS_GetReservedSlot(thisObj, SlotA));
   JS::RootedValue v_b(cx, JS_GetReservedSlot(thisObj, SlotB));

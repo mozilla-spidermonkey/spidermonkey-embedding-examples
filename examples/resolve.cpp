@@ -99,14 +99,16 @@ class Crc {
 
   static bool update(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+    JS::RootedObject thisObj(cx);
+    if (!args.computeThis(cx, &thisObj)) return false;
     if (!checkIsInstance(cx, thisObj, "call update()")) return false;
     return getPriv(thisObj)->updateImpl(cx, args);
   }
 
   static bool getChecksum(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+    JS::RootedObject thisObj(cx);
+    if (!args.computeThis(cx, &thisObj)) return false;
     if (!checkIsInstance(cx, thisObj, "read checksum")) return false;
     return getPriv(thisObj)->getChecksumImpl(cx, args);
   }
