@@ -18,7 +18,7 @@ nondebug_spidermonkey = cxx.compiles('''
 #endif
 ''',
     args: args, dependencies: spidermonkey,
-    name: 'SpiderMonkey debug check')
+    name: 'SpiderMonkey is a non-debug build')
 
 if not nondebug_spidermonkey
     args += '-DDEBUG=1'
