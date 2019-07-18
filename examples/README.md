@@ -52,3 +52,7 @@ in the `meson.build` file, and add a description of it to this
   examples showing how to do common operations with SpiderMonkey.
 - **repl.cpp** - Best practices for creating a mini JavaScript
   interpreter, consisting of a read-eval-print loop.
+- **resolve.cpp** - Best practices for creating a JS class that uses
+  lazy property resolution.
+  Use this in cases where defining properties and methods in your class
+  upfront might be slow.

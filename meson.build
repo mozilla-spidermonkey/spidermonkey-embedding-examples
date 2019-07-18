@@ -5,6 +5,7 @@ cxx = meson.get_compiler('cpp')
 
 args = ['-std=c++14', '-Wall']
 
+zlib = dependency('zlib')  # (is already a SpiderMonkey dependency)
 spidermonkey = dependency('mozjs-60')
 readline = cxx.find_library('readline')
 
@@ -68,3 +69,4 @@ executable('hello', 'examples/hello.cpp', 'examples/boilerplate.cpp', dependenci
 executable('cookbook', 'examples/cookbook.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
 executable('repl', 'examples/repl.cpp', 'examples/boilerplate.cpp', dependencies: [spidermonkey, readline])
 executable('tracing', 'examples/tracing.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
+executable('resolve', 'examples/resolve.cpp', 'examples/boilerplate.cpp', dependencies: [spidermonkey, zlib])
