@@ -13,7 +13,7 @@
 
 namespace zlib {
 #include <zlib.h>
-};
+}
 
 /* This example illustrates how to set up a class with a custom resolve hook, in
  * order to do lazy property resolution.
