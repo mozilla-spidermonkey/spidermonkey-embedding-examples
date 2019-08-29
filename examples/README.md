@@ -5,13 +5,13 @@
 You need Meson 0.43.0 or later to build the examples.
 Installation instructions for Meson are [here](https://mesonbuild.com/Getting-meson.html).
 
-You will also need SpiderMonkey ESR 60 installed where Meson can find
+You will also need SpiderMonkey ESR 68 installed where Meson can find
 it.
-Generally this means that the `mozjs-60.pc` file needs to be installed
-in a location known to pkg-config, and the `libmozjs-60.so` file needs
+Generally this means that the `mozjs-68.pc` file needs to be installed
+in a location known to pkg-config, and the `libmozjs-68.so` file needs
 to be in the path for loading libraries.
 
-Many Linux distributions have development packages for SpiderMonkey 60
+Many Linux distributions have development packages for SpiderMonkey 68
 and if you just want to try the examples, installing that is the easiest
 way to get a build of SpiderMonkey.
 If you are on macOS or Windows, or want to do any development, read the

@@ -22,9 +22,9 @@ than just `autoconf`.
 
 Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
-At the time of writing, the latest source for Firefox ESR 60, which
-contains the source for SpiderMonkey ESR 60, can be found here:
-http://ftp.mozilla.org/pub/firefox/releases/60.3.0esr/source/
+At the time of writing, the latest source for Firefox ESR 68, which
+contains the source for SpiderMonkey ESR 68, can be found here:
+https://ftp.mozilla.org/pub/firefox/releases/68.2.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
