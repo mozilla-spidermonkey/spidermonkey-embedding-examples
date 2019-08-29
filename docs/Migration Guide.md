@@ -97,6 +97,48 @@ string is always clear.
   value of `JS_EncodeString()` was returned, to also return a smart
   pointer.
 
+### Hash tables ###
+
+It is no longer necessary to initialize `JS::GCHashMap<>` with `init()`.
+
+**Recommendation:** Simply remove the call to `init()`, or if you were
+using it to reserve space in the hash map while initializing it, replace
+it with a call to `reserve()`.
+
+### Principals ###
+
+Functions having to do with stack frames, such as
+`JS::GetSavedFrameSource()` and others, now take a `JSPrincipals*`
+pointer as an argument.
+This is a trust token that indicates the privileges of the current
+caller.
+The stack frame APIs use this to appropriately hide system stack frames
+from less trusted code.
+
+**Recommendations:**
+- If you are using `JSPrincipals` in your code, then pass the
+  appropriate one to these functions.
+- If not, you can find the current context's principal with
+  `cx->realm()->principals()`.
+  However, if you are not using `JS_SetSecurityCallbacks()` then you can
+  probably just pass `nullptr` for the `JSPrincipals` argument.
+
+### C-allocated memory ###
+
+Previously when associating C-allocated memory with a JS object, the API
+to use was `JS_updateMallocCounter()`.
+This inexact API is now gone.
+Instead, you can tell the JS engine exactly how much memory is
+associated with a particular JS object with `JS::AddAssociatedMemory()`.
+
+Note that each call to `JS::AddAssociatedMemory()` must be exactly
+matched by a call to `JS::RemoveAssociatedMemory()`.
+
+**Recommendation:** You may need to restructure your code if you were
+using `JS_updateMallocCounter()`.
+It may be useful to call `JS::AddAssociatedMemory()` in your `JSClass`'s
+constructor, and `JS::RemoveAssociatedMemory()` in the finalizer.
+
 ### Headers ###
 
 There are now more optional headers which should be included separately
