@@ -114,7 +114,8 @@ class Crc {
   }
 
   static bool newEnumerate(JSContext* cx, JS::HandleObject obj,
-                           JS::AutoIdVector& properties, bool enumerableOnly) {
+                           JS::MutableHandleIdVector properties,
+                           bool enumerableOnly) {
     // We only want to enumerate if obj is the prototype. For instances, we
     // should return immediately, and this will be called again on the
     // prototype.
