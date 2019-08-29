@@ -110,3 +110,30 @@ code, try checking if you might have to include another header.
 - `JS::ContextOptions` — `<js/ContextOptions.h>`
 - `JS::WarnUTF8()` and similar functions, and `JS::SetWarningReporter()`
   — `<js/Warnings.h>`
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS_DefineProperty()` for a property with getter and setter function
+  objects no longer needs to use `JS_DATA_TO_FUNC_PTR()`.
+  There is an appropriate overload to use instead.
+- `JS_GetGlobalForObject()` → `JS::GetNonCCWObjectGlobal()`
+- `JS_NewArrayBuffer()` → `JS::NewArrayBuffer()`; ditto for
+  `JS_NewArrayBufferWithContents()` and `JS_NewExternalArrayBuffer()`.
+  In addition, `JS::NewExternalArrayBuffer()` has dropped support for
+  the ref callback.
+- `JS_ObjectIsFunction()` → `js::IsFunctionObject()`
+- `JS_ReportWarningASCII()` → `JS::WarnASCII()`
+- `JS_ReportWarningUTF8()` → `JS::WarnUTF8()`
+- `JS::AutoIdVector` → `JS::RootedIdVector`, `JS::HandleIdVector`, or
+  `JS::MutableHandleIdVector`; ditto for `JS::AutoObjectVector` and
+  `JS::AutoValueVector`
+- `JS::CallArgs::computeThis()` now takes a `JS::MutableHandleObject`
+  out parameter, instead of returning a `JS::Value` which then must be
+  converted to an object.
+- `JS::CurrentThreadIsHeapCollecting()` →
+  `JS::RuntimeHeapIsCollecting()`
+- `JS::FormatStackDump()` has removed its input buffer parameter.
+- `JS::GCForReason()` → `JS::NonIncrementalGC()`
+- `JS::GCPolicy<T>::initial()` → `JS::SafelyInitialized<T>`
