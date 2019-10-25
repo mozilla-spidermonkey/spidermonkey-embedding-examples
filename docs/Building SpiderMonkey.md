@@ -12,7 +12,7 @@ also usually available through a package manager.
 The package will usually be called something like `autoconf2.13` rather
 than just `autoconf`.
 
-> **NOTE** SpiderMonkey also requires ICU of at least version 59.1, but
+> **NOTE** SpiderMonkey also requires ICU of at least version 63.1, but
 > it will build a bundled copy by default.
 > If you have a new enough copy installed on your system, you can add
 > `--with-system-icu` in the build instructions below, for a shorter
@@ -22,9 +22,9 @@ than just `autoconf`.
 
 Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
-At the time of writing, the latest source for Firefox ESR 60, which
-contains the source for SpiderMonkey ESR 60, can be found here:
-http://ftp.mozilla.org/pub/firefox/releases/60.3.0esr/source/
+At the time of writing, the latest source for Firefox ESR 68, which
+contains the source for SpiderMonkey ESR 68, can be found here:
+https://ftp.mozilla.org/pub/firefox/releases/68.2.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
@@ -48,8 +48,9 @@ writable to you without superuser permissions, for example.
 cd js/src
 mkdir _build
 cd _build
-../configure --disable-jemalloc  --enable-posix-nspr-emulation \
-    --with-system-zlib --with-intl-api --enable-debug --enable-optimize
+../configure --disable-jemalloc --enable-posix-nspr-emulation \
+    --enable-unaligned-private-values --with-system-zlib \
+    --with-intl-api --enable-debug --enable-optimize
 make
 make install  # sudo if necessary
 ```

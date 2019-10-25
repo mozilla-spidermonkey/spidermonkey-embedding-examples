@@ -5,8 +5,10 @@
 
 #include <mozilla/Unused.h>
 
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/SourceText.h>
 
 #include "boilerplate.h"
 
@@ -121,7 +123,7 @@ static bool SetValue(JSContext* cx) {
  */
 static bool FindGlobalObject(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+  JS::RootedObject global(cx, JS::GetNonCCWObjectGlobal(&args.callee()));
   if (!global) return false;
 
   // For comparison, here's how to do it with JS::CurrentGlobalOrNull():
@@ -743,7 +745,8 @@ static bool MyClassPropGetter(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+  JS::RootedObject thisObj(cx);
+  if (!args.computeThis(cx, &thisObj)) return false;
 
   JS::RootedValue v_a(cx, JS_GetReservedSlot(thisObj, SlotA));
   JS::RootedValue v_b(cx, JS_GetReservedSlot(thisObj, SlotB));
@@ -849,7 +852,7 @@ static bool GenericJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool ThrowJSNative(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedObject global(cx, JS_GetGlobalForObject(cx, &args.callee()));
+  JS::RootedObject global(cx, JS::GetNonCCWObjectGlobal(&args.callee()));
   if (!global) return false;
   return THROW_ERROR(cx, global, "Error message");
 }
@@ -867,8 +870,14 @@ static JSFunctionSpec globalFunctions[] = {
 static bool ExecuteCode(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
+
+  JS::SourceText<mozilla::Utf8Unit> source;
+  if (!source.init(cx, code, strlen(code), JS::SourceOwnership::Borrowed)) {
+    return false;
+  }
+
   JS::RootedValue unused(cx);
-  return JS::Evaluate(cx, options, code, strlen(code), &unused);
+  return JS::Evaluate(cx, options, source, &unused);
 }
 
 class AutoReportException {
@@ -899,12 +908,10 @@ class AutoReportException {
 /* Execute each of the examples; many don't do anything but it's good to be able
  * to exercise the code to make sure it hasn't bitrotted. */
 static bool RunCookbook(JSContext* cx) {
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) return false;
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   // Define some helper methods on our new global.
   if (!JS_DefineFunctions(cx, global, globalFunctions)) return false;

@@ -4,14 +4,16 @@
 #include <jsapi.h>
 #include <jsfriendapi.h>
 
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/SourceText.h>
 
 #include "boilerplate.h"
 
 namespace zlib {
 #include <zlib.h>
-};
+}
 
 /* This example illustrates how to set up a class with a custom resolve hook, in
  * order to do lazy property resolution.
@@ -97,20 +99,23 @@ class Crc {
 
   static bool update(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+    JS::RootedObject thisObj(cx);
+    if (!args.computeThis(cx, &thisObj)) return false;
     if (!checkIsInstance(cx, thisObj, "call update()")) return false;
     return getPriv(thisObj)->updateImpl(cx, args);
   }
 
   static bool getChecksum(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject thisObj(cx, &args.computeThis(cx).toObject());
+    JS::RootedObject thisObj(cx);
+    if (!args.computeThis(cx, &thisObj)) return false;
     if (!checkIsInstance(cx, thisObj, "read checksum")) return false;
     return getPriv(thisObj)->getChecksumImpl(cx, args);
   }
 
   static bool newEnumerate(JSContext* cx, JS::HandleObject obj,
-                           JS::AutoIdVector& properties, bool enumerableOnly) {
+                           JS::MutableHandleIdVector properties,
+                           bool enumerableOnly) {
     // We only want to enumerate if obj is the prototype. For instances, we
     // should return immediately, and this will be called again on the
     // prototype.
@@ -240,13 +245,21 @@ static const char* testProgram = R"js(
 static bool ExecuteCodePrintResult(JSContext* cx, const char* code) {
   JS::CompileOptions options(cx);
   options.setFileAndLine("noname", 1);
+
+  JS::SourceText<mozilla::Utf8Unit> source;
+  if (!source.init(cx, code, strlen(code), JS::SourceOwnership::Borrowed)) {
+    return false;
+  }
+
   JS::RootedValue rval(cx);
-  if (!JS::Evaluate(cx, options, code, strlen(code), &rval)) return false;
+  if (!JS::Evaluate(cx, options, source, &rval)) return false;
 
   JS::RootedString rval_str(cx, JS::ToString(cx, rval));
   if (!rval_str) return false;
 
-  std::cout << JS_EncodeString(cx, rval_str) << '\n';
+  // The printed value will be a number, so we know it will be an ASCII string
+  // that we can just print directly.
+  std::cout << JS_EncodeStringToASCII(cx, rval_str).get() << '\n';
   return true;
 }
 
@@ -265,18 +278,17 @@ void LogException(JSContext* cx) {
   JS::RootedString exc_str(cx, JS::ToString(cx, exception));
   if (!exc_str) die("Exception thrown, could not be converted to string");
 
-  std::cout << "Exception thrown: " << JS_EncodeString(cx, exc_str) << '\n';
+  std::cout << "Exception thrown: " << JS_EncodeStringToUTF8(cx, exc_str).get()
+            << '\n';
 }
 
 static bool ResolveExample(JSContext* cx) {
-  JSAutoRequest ar(cx);
-
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) {
     return false;
   }
 
-  JSAutoCompartment ac(cx, global);
+  JSAutoRealm ar(cx, global);
 
   if (!Crc::DefinePrototype(cx)) {
     LogException(cx);

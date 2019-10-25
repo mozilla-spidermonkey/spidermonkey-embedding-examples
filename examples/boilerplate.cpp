@@ -7,30 +7,13 @@
 // This file contains boilerplate code used by a number of examples. Ideally
 // this should eventually become part of SpiderMonkey itself.
 
-// A standard set of ClassOps for globals. This includes hooks to resolve
-// standard JavaScript builtin types to give a more full-featured shell.
-const JSClassOps boilerplate::DefaultGlobalClassOps = {
-    nullptr,                         // addProperty
-    nullptr,                         // deleteProperty
-    nullptr,                         // enumerate
-    JS_NewEnumerateStandardClasses,  // newEnumerate
-    JS_ResolveStandardClass,         // resolve
-    JS_MayResolveStandardClass,      // mayResolve
-    nullptr,                         // finalize
-    nullptr,                         // call
-    nullptr,                         // hasInstance
-    nullptr,                         // construct
-    JS_GlobalObjectTraceHook         // trace
-};
-
 // Create a simple Global object. A global object is the top-level 'this' value
 // in a script and is required in order to compile or execute JavaScript.
 JSObject* boilerplate::CreateGlobal(JSContext* cx) {
-  JS::CompartmentOptions options;
+  JS::RealmOptions options;
 
-  static JSClass BoilerplateGlobalClass = {"BoilerplateGlobal",
-                                           JSCLASS_GLOBAL_FLAGS,
-                                           &boilerplate::DefaultGlobalClassOps};
+  static JSClass BoilerplateGlobalClass = {
+      "BoilerplateGlobal", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps};
 
   return JS_NewGlobalObject(cx, &BoilerplateGlobalClass, nullptr,
                             JS::FireOnNewGlobalHook, options);
