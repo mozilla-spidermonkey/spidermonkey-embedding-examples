@@ -146,9 +146,9 @@ class Crc {
       return true;
     }
 
-    JSFlatString* str = JSID_TO_FLAT_STRING(id);
+    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
 
-    if (JS_FlatStringEqualsAscii(str, "update")) {
+    if (JS_LinearStringEqualsAscii(str, "update")) {
       if (!JS_DefineFunctionById(cx, obj, id, &Crc::update, 1,
                                  JSPROP_ENUMERATE))
         return false;
@@ -156,7 +156,7 @@ class Crc {
       return true;
     }
 
-    if (JS_FlatStringEqualsAscii(str, "checksum")) {
+    if (JS_LinearStringEqualsAscii(str, "checksum")) {
       if (!JS_DefinePropertyById(cx, obj, id, &Crc::getChecksum, nullptr,
                                  JSPROP_ENUMERATE))
         return false;
@@ -172,9 +172,9 @@ class Crc {
                          JSObject* maybeObj) {
     if (!JSID_IS_STRING(id)) return false;
 
-    JSFlatString* str = JSID_TO_FLAT_STRING(id);
-    return JS_FlatStringEqualsAscii(str, "update") ||
-           JS_FlatStringEqualsAscii(str, "checksum");
+    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
+    return JS_LinearStringEqualsAscii(str, "update") ||
+           JS_LinearStringEqualsAscii(str, "checksum");
   }
 
   static void finalize(JSFreeOp* fop, JSObject* obj) {

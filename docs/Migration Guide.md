@@ -9,6 +9,13 @@ of SpiderMonkey to the next ESR version.
 
 A C++ compiler that can support C++17 is now required.
 
+### Flat strings ###
+
+There is no longer any distinction made between flat strings and linear strings.
+
+**Recommendation:** For everything that was done with `JSFlatString`, simply use `JSLinearString` instead.
+`js::FlatStringToLinearString()` is no longer necessary and can be removed altogether.
+
 ### Headers ###
 
 There are now more optional headers which should be included separately
