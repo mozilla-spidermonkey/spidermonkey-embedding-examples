@@ -12,7 +12,7 @@ JSAPI functions never throw C++ exceptions, and when SpiderMonkey calls
 an application callback, the callback must not throw a C++ exception.
 
 See the `ReportError`, `ThrowValue`, and `ThrowError` examples in
-the [JSAPI Cookbook](../examples.cookbook.cpp) that show how to work
+the [JSAPI Cookbook](../examples/cookbook.cpp) that show how to work
 with JavaScript exceptions in C++.
 
 ## Uncatchable errors ##
@@ -26,9 +26,11 @@ if (!p) {
 }
 ```
 
-This does something subtly different from what `JS_ReportError` does.
+This does something subtly different from what `JS_ReportErrorUTF8` and
+similar functions do.
 
-Most errors, including those raised by `JS_ReportError`, are represented
+Most errors, including those raised by `JS_ReportErrorUTF8`, are
+represented
 as JavaScript exceptions and thus interact with the JavaScript
 exception-handling language features, `try`, `catch`, and `finally`.
 However, in some cases we do not want scripts to be able to `catch` an

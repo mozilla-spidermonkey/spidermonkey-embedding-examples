@@ -79,7 +79,7 @@ On success, a `JSNative` must call `args.rval()` and return `true`.
 The value stored in `args.rval()` is returned to the JavaScript caller.
 
 On failure, a `JSNative` calls an error-reporting function, e.g.
-`JS_ReportError`, and returns `false`.
+`JS_ReportErrorUTF8`, and returns `false`.
 This causes a JavaScript exception to be thrown.
 The caller can catch the exception using a JavaScript `try/catch`
 statement.
