@@ -3,6 +3,12 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
+## ESR 68 to ESR 78 ##
+
+### Requirements ###
+
+A C++ compiler that can support C++17 is now required.
+
 ## ESR 60 to ESR 68 ##
 
 ### Remove requests ###

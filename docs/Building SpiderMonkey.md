@@ -4,7 +4,7 @@ Use these instructions to build your own copy of SpiderMonkey.
 
 ## Prerequisites ##
 
-You will need a **C++ compiler** that can handle the C++14 standard,
+You will need a **C++ compiler** that can handle the C++17 standard,
 **GNU Make**, **zlib**, and **libffi**.
 These can usually be installed with a package manager.
 You will also need **Autoconf 2.13** (not any later version) which is
@@ -22,9 +22,9 @@ than just `autoconf`.
 
 Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
-At the time of writing, the latest source for Firefox ESR 68, which
-contains the source for SpiderMonkey ESR 68, can be found here:
-https://ftp.mozilla.org/pub/firefox/releases/68.2.0esr/source/
+At the time of writing, the latest source for Firefox ESR 78, which
+contains the source for SpiderMonkey ESR 78, can be found here:
+https://ftp.mozilla.org/pub/firefox/releases/78.1.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
@@ -48,8 +48,7 @@ writable to you without superuser permissions, for example.
 cd js/src
 mkdir _build
 cd _build
-../configure --disable-jemalloc --enable-posix-nspr-emulation \
-    --enable-unaligned-private-values --with-system-zlib \
+../configure --disable-jemalloc --with-system-zlib \
     --with-intl-api --enable-debug --enable-optimize
 make
 make install  # sudo if necessary
