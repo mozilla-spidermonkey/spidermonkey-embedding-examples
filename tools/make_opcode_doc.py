@@ -1,4 +1,4 @@
-#!/usr/bin/env python -B
+#!/usr/bin/env -S python -B
 # coding: utf-8
 
 """ Usage: make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE
@@ -146,7 +146,7 @@ if __name__ == '__main__':
     try:
         index, _ = jsopcode.get_opcodes(dir)
     except Exception as e:
-        print("Error: {}".format(e.args[0]), file=sys.stderr)
+        print("Error: {}".format(' '.join(map(str, e.args))), file=sys.stderr)
         sys.exit(1)
 
     with open(os.path.join(thisdir, '..', 'docs', 'Bytecodes.md'), 'w') as out:
