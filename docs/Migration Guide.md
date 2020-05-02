@@ -9,6 +9,23 @@ of SpiderMonkey to the next ESR version.
 
 A C++ compiler that can support C++17 is now required.
 
+### Headers ###
+
+There are now more optional headers which should be included separately
+in code which uses their functionality.
+This is a list of common ones that might be used by embeddings, but in
+general if you are missing function definitions when compiling your
+code, try checking if you might have to include another header.
+
+- `JS::NewArrayObject()`, `JS::GetArrayLength()`, and similar functions —
+  `<js/Array.h>`
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS_NewArrayObject()` → `JS::NewArrayObject()`
+
 ## ESR 60 to ESR 68 ##
 
 ### Remove requests ###

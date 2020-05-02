@@ -5,6 +5,7 @@
 
 #include <mozilla/Unused.h>
 
+#include <js/Array.h>
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
@@ -171,7 +172,7 @@ static bool DefineGlobalFunction(JSContext* cx, JS::HandleObject global) {
  * var x = [];  // or "x = Array()", or "x = new Array"
  */
 static bool CreateArray(JSContext* cx) {
-  JS::RootedObject x(cx, JS_NewArrayObject(cx, 0));
+  JS::RootedObject x(cx, JS::NewArrayObject(cx, 0));
   if (!x) return false;
 
   return true;
