@@ -12,6 +12,8 @@
 
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
+#include <js/ErrorReport.h>
+#include <js/Exception.h>
 #include <js/Initialization.h>
 #include <js/SourceText.h>
 #include <js/Warnings.h>
@@ -72,108 +74,6 @@ static void die(const char* why) {
   exit(1);
 }
 
-// The PrintError functions are modified versions of private SpiderMonkey API:
-// js/src/vm/JSContext.cpp, js::PrintError()
-
-enum class PrintErrorKind { Error, Warning, StrictWarning, Note };
-
-static void PrintErrorLine(const std::string& prefix, JSErrorReport* report) {
-  const char16_t* linebuf = report->linebuf();
-  if (!linebuf) return;
-
-  size_t n = report->linebufLength();
-
-  std::cerr << ":\n";
-  if (!prefix.empty()) std::cerr << prefix;
-
-  std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter{};
-  std::string linebuf_utf8 = converter.to_bytes(linebuf);
-  std::cerr << linebuf_utf8;
-
-  // linebuf usually ends with a newline. If not, add one here.
-  if (n == 0 || linebuf[n - 1] != '\n') std::cerr << '\n';
-
-  if (!prefix.empty()) std::cerr << prefix;
-
-  n = report->tokenOffset();
-  size_t ndots = 0;
-  for (size_t i = 0; i < n; i++) {
-    if (linebuf[i] == '\t') {
-      ndots += (ndots + 8) & ~7;
-      continue;
-    }
-    ndots++;
-  }
-  std::cerr << std::string(ndots, '.') << '^';
-}
-
-static void PrintErrorLine(const std::string& prefix,
-                           JSErrorNotes::Note* note) {}
-
-template <typename T>
-static bool PrintSingleError(T* report, PrintErrorKind kind) {
-  std::ostringstream prefix;
-  if (report->filename) prefix << report->filename << ':';
-
-  if (report->lineno) prefix << report->lineno << ':' << report->column << ' ';
-
-  if (kind != PrintErrorKind::Error) {
-    const char* kindPrefix = nullptr;
-    switch (kind) {
-      case PrintErrorKind::Error:
-        MOZ_CRASH("unreachable");
-      case PrintErrorKind::Warning:
-        kindPrefix = "warning";
-        break;
-      case PrintErrorKind::StrictWarning:
-        kindPrefix = "strict warning";
-        break;
-      case PrintErrorKind::Note:
-        kindPrefix = "note";
-        break;
-    }
-
-    prefix << kindPrefix << ": ";
-  }
-
-  const char* message = report->message().c_str();
-
-  /* embedded newlines -- argh! */
-  const char* ctmp;
-  while ((ctmp = strchr(message, '\n')) != 0) {
-    ctmp++;
-    if (prefix) std::cerr << prefix.str();
-    std::cerr.write(message, ctmp - message);
-    message = ctmp;
-  }
-
-  /* If there were no filename or lineno, the prefix might be empty */
-  if (!prefix.str().empty()) std::cerr << prefix.str();
-  std::cerr << message;
-
-  PrintErrorLine(prefix.str(), report);
-  std::cerr << std::endl;  // flushes
-  return true;
-}
-
-static void PrintError(JSErrorReport* report) {
-  assert(report);
-
-  PrintErrorKind kind = PrintErrorKind::Error;
-  if (JSREPORT_IS_WARNING(report->flags)) {
-    if (JSREPORT_IS_STRICT(report->flags))
-      kind = PrintErrorKind::StrictWarning;
-    else
-      kind = PrintErrorKind::Warning;
-  }
-  PrintSingleError(report, kind);
-
-  if (report->notes) {
-    for (auto&& note : *report->notes)
-      PrintSingleError(note.get(), PrintErrorKind::Note);
-  }
-}
-
 std::string FormatString(JSContext* cx, JS::HandleString string) {
   std::string buf = "\"";
 
@@ -231,30 +131,17 @@ std::string FormatResult(JSContext* cx, JS::HandleValue value) {
   return bytes.get();
 }
 
-static JSErrorReport* ErrorFromExceptionValue(JSContext* cx,
-                                              JS::HandleValue exception) {
-  if (!exception.isObject()) return nullptr;
-  JS::RootedObject exceptionObject(cx, &exception.toObject());
-  return JS_ErrorFromException(cx, exceptionObject);
-}
-
 static void ReportAndClearException(JSContext* cx) {
   /* Get exception object before printing and clearing exception. */
-  JS::RootedValue exception(cx);
-  if (!JS_GetPendingException(cx, &exception))
+  JS::ExceptionStack stack(cx);
+  if (!JS::StealPendingExceptionStack(cx, &stack))
     die("Uncatchable exception thrown, out of memory or something");
 
-  JS_ClearPendingException(cx);
+  JS::ErrorReportBuilder report(cx);
+  if (!report.init(cx, stack, JS::ErrorReportBuilder::WithSideEffects))
+    die("Couldn't build error report");
 
-  JSErrorReport* report = ErrorFromExceptionValue(cx, exception);
-  if (!report) {
-    JS_ClearPendingException(cx);
-    std::cerr << "error: " << FormatResult(cx, exception) << '\n';
-    return;
-  }
-
-  assert(!JSREPORT_IS_WARNING(report->flags));
-  PrintError(report);
+  JS::PrintError(cx, stderr, report, false);
 }
 
 JSObject* ReplGlobal::create(JSContext* cx) {
@@ -344,8 +231,9 @@ static bool RunREPL(JSContext* cx) {
 
   JSAutoRealm ar(cx, global);
 
-  JS::SetWarningReporter(
-      cx, [](JSContext*, JSErrorReport* report) { PrintError(report); });
+  JS::SetWarningReporter(cx, [](JSContext* cx, JSErrorReport* report) {
+    JS::PrintError(cx, stderr, report, true);
+  });
 
   ReplGlobal::loop(cx, global);
 
