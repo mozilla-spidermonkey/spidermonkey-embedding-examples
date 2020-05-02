@@ -12,7 +12,7 @@ JSAPI functions never throw C++ exceptions, and when SpiderMonkey calls
 an application callback, the callback must not throw a C++ exception.
 
 See the `ReportError`, `ThrowValue`, and `ThrowError` examples in
-the [JSAPI Cookbook](../examples.cookbook.cpp) that show how to work
+the [JSAPI Cookbook](../examples/cookbook.cpp) that show how to work
 with JavaScript exceptions in C++.
 
 ## Uncatchable errors ##
