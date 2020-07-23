@@ -161,6 +161,7 @@ This is a non-exhaustive list of minor API changes and renames.
   objects no longer needs to use `JS_DATA_TO_FUNC_PTR()`.
   There is an appropriate overload to use instead.
 - `JS_GetGlobalForObject()` → `JS::GetNonCCWObjectGlobal()`
+- `JS_InitStandardClasses()` → `JS::InitRealmStandardClasses()`
 - `JS_NewArrayBuffer()` → `JS::NewArrayBuffer()`; ditto for
   `JS_NewArrayBufferWithContents()` and `JS_NewExternalArrayBuffer()`.
   In addition, `JS::NewExternalArrayBuffer()` has dropped support for
