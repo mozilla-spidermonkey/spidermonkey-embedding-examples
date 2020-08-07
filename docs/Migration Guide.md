@@ -26,12 +26,14 @@ code, try checking if you might have to include another header.
 
 - `JS::NewArrayObject()`, `JS::GetArrayLength()`, and similar functions —
   `<js/Array.h>`
+- `JS::RootedValueArray`, `JS::HandleValueArray`, and similar types — `<js/ValueArray.h>`
 
 ### Various API changes ###
 
 This is a non-exhaustive list of minor API changes and renames.
 
 - `JS_NewArrayObject()` → `JS::NewArrayObject()`
+- `JS::AutoValueArray` → `JS::RootedValueArray`
 
 ## ESR 60 to ESR 68 ##
 

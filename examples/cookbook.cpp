@@ -10,6 +10,7 @@
 #include <js/Conversions.h>
 #include <js/Initialization.h>
 #include <js/SourceText.h>
+#include <js/ValueArray.h>
 
 #include "boilerplate.h"
 
@@ -220,7 +221,7 @@ static bool ConstructObjectWithNew(JSContext* cx, JS::HandleObject global) {
   JS::RootedString name_str(cx, JS_NewStringCopyZ(cx, "Dave"));
   if (!name_str) return false;
 
-  JS::AutoValueArray<2> args(cx);
+  JS::RootedValueArray<2> args(cx);
   args[0].setString(name_str);
   args[1].setInt32(24);
 
@@ -357,7 +358,7 @@ static bool ThrowError(JSContext* cx, JS::HandleObject global,
   JS::RootedString filenameStr(cx, JS_NewStringCopyZ(cx, filename));
   if (!filenameStr) return false;
 
-  JS::AutoValueArray<3> args(cx);
+  JS::RootedValueArray<3> args(cx);
   args[0].setString(messageStr);
   args[1].setString(filenameStr);
   args[2].setInt32(lineno);
