@@ -122,11 +122,11 @@ class Crc {
     if (!isPrototype(obj)) return true;
 
     jsid idUpdate =
-        INTERNED_STRING_TO_JSID(cx, JS_AtomizeAndPinString(cx, "update"));
+        JS::PropertyKey::fromPinnedString(JS_AtomizeAndPinString(cx, "update"));
     if (!properties.append(idUpdate)) return false;
 
-    jsid idChecksum =
-        INTERNED_STRING_TO_JSID(cx, JS_AtomizeAndPinString(cx, "checksum"));
+    jsid idChecksum = JS::PropertyKey::fromPinnedString(
+        JS_AtomizeAndPinString(cx, "checksum"));
     if (!properties.append(idChecksum)) return false;
 
     return true;

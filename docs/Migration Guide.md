@@ -34,6 +34,7 @@ This is a non-exhaustive list of minor API changes and renames.
 
 - `JS_NewArrayObject()` → `JS::NewArrayObject()`
 - `JS::AutoValueArray` → `JS::RootedValueArray`
+- `INTERNED_STRING_TO_JSID()` → `JS::PropertyKey::fromPinnedString()`
 
 ## ESR 60 to ESR 68 ##
 
