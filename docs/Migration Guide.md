@@ -16,6 +16,51 @@ There is no longer any distinction made between flat strings and linear strings.
 **Recommendation:** For everything that was done with `JSFlatString`, simply use `JSLinearString` instead.
 `js::FlatStringToLinearString()` is no longer necessary and can be removed altogether.
 
+### JSClass ###
+
+There is no longer any distinction made between the public `JSClass` API and the semi-private `js::Class` API.
+Both are `JSClass` now.
+
+**Recommendation:** Embeddings most probably did not need to use `js::Class` anyway, but if you did, you can convert it to `JSClass`.
+The fields of these two structs are mostly the same.
+The function to convert between the two, `js::Jsvalify()`, can be removed altogether.
+
+### Error reports ###
+
+It is no longer possible to access the `flags` member of `JSErrorReport`, and the flags constants have been removed.
+
+**Recommendation:** Instead of checking for `JSREPORT_ERROR` and `JSREPORT_WARNING`, use the `JSErrorReport::isWarning()` method. There is no equivalent for `JSREPORT_EXCEPTION` and `JSREPORT_STRICT`.
+
+Additionally, instead of `JS_ErrorFromException()` and `JSErrorReport`, consider using `JS::StealPendingException()` and `JS::ErrorReportBuilder`.
+
+### Security changes ###
+
+`JS::PromiseRejectionTrackerCallback` callbacks now take an extra `bool mutedErrors` parameter.
+This is to prevent details from being leaked to untrusted cross-origin scripts via error messages.
+
+The `uneval()` function and the `toSource()` methods are now disabled by default, but they can be re-enabled per realm using `JS::RealmCreationOptions::setToSourceEnabled()`.
+
+**Recommendation:** If your embedding is only running trusted code, i.e. you are not setting the `mutedErrors` flag on any `JS::CompileOptions`, then you can ignore this argument in your callback.
+If you are using the muted errors feature, then make sure that your callback doesn't perform any observable actions if this argument is `true`.
+
+If you were using `toSource()` or `uneval()` you can keep them enabled in the `JS::Realm` where they are needed, but it's probably best to find an alternative for this functionality.
+
+### Debugger API ###
+
+The Debugger API has removed the `Debugger.enabled` property.
+
+**Recommendation:** Instead of setting the `enabled` property to `false`, use the `removeAllDebuggees()` method.
+Instead of setting the property to `true`, add new debuggee objects.
+
+### Defaults ###
+
+There are some things that were optional in ESR 68 that are now the default and can be omitted:
+
+- `JSGC_DYNAMIC_MARK_SLICE`
+- `JSGC_DYNAMIC_HEAP_GROWTH`
+- `JS::RealmCreationOptions::setBigIntEnabled()`
+- `JS::RealmCreationOptions::setFieldsEnabled()`
+
 ### Headers ###
 
 There are now more optional headers which should be included separately
@@ -27,6 +72,7 @@ code, try checking if you might have to include another header.
 - `JS::NewArrayObject()`, `JS::GetArrayLength()`, and similar functions —
   `<js/Array.h>`
 - `JS::RootedValueArray`, `JS::HandleValueArray`, and similar types — `<js/ValueArray.h>`
+- `<js/ComparisonOperators.h>` is now needed for certain types' `operator==()` and `operator!=()`, although you will probably not need to include this directly.
 
 ### Various API changes ###
 
@@ -35,6 +81,17 @@ This is a non-exhaustive list of minor API changes and renames.
 - `JS_NewArrayObject()` → `JS::NewArrayObject()`
 - `JS::AutoValueArray` → `JS::RootedValueArray`
 - `INTERNED_STRING_TO_JSID()` → `JS::PropertyKey::fromPinnedString()`
+- `JS_IsArrayObject()` → `JS::IsArrayObject()`
+- `JS_GetArrayLength()` → `JS::GetArrayLength()`
+- `JSID_TO_FLAT_STRING()` → `JSID_TO_LINEAR_STRING()`
+- `JS_ASSERT_STRING_IS_FLAT()` → `JS_ASSERT_STRING_IS_LINEAR()`
+- `JS_FORGET_STRING_FLATNESS()` → `JS_FORGET_STRING_LINEARNESS()`
+- `JS_StringIsFlat()` → `JS_StringIsLinear()`
+- `js::gc::detail::GetGCThingZone()` → `JS::GetGCThingZone()`
+- `JSGC_SLICE_TIME_BUDGET` → `JSGC_SLICE_TIME_BUDGET_MS`
+- `JSGCCallback` now takes an extra `JS::GCReason` parameter indicating why the garbage collection was initiated.
+- `js::GetCodeCoverageSummary()` returns `JS::UniqueChars` instead of `char*`.
+- `JSGC_MAX_MALLOC_BYTES` no longer did anything, so was removed.
 
 ## ESR 60 to ESR 68 ##
 
