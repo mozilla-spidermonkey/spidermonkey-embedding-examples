@@ -1,7 +1,7 @@
 # Bytecode Listing #
 
 This document is automatically generated from
-[`Opcodes.h`](https://searchfox.org/mozilla-esr68/source/js/src/vm/Opcodes.h) by
+[`Opcodes.h`](https://searchfox.org/mozilla-esr78/source/js/src/vm/Opcodes.h) by
 [`make_opcode_doc.py`](../tools/make_opcode_doc.py).
 
 ## Background ##
@@ -34,2504 +34,3717 @@ There is always a "Top of Stack" (TOS) that corresponds to the latest value
 pushed onto the expression stack.
 All bytecodes implicitly operate in terms of this location.
 
-## Bytecode listing ##
-
-All opcodes are annotated with a `[-popcount, +pushcount]` to represent the
-overall stack-effects of their execution.
 
 
-### Statements ###
+### Constants ###
+
+
+
+##### `Undefined`
+
+
+**Stack:** &rArr; `undefined`
+
+Push `undefined`.
+
+
+
+##### `Null`
+
+
+**Stack:** &rArr; `null`
+
+Push `null`.
+
+
+
+##### `False`, `True`
+
+
+**Stack:** &rArr; `true/false`
+
+Push a boolean constant.
+
+
+
+##### `Int32`
+
+**Operands:** `(int32_t val)`
+
+**Stack:** &rArr; `val`
+
+Push the `int32_t` immediate operand as an `Int32Value`.
+
+`JSOp::Zero`, `JSOp::One`, `JSOp::Int8`, `JSOp::Uint16`, and `JSOp::Uint24`
+are all compact encodings for `JSOp::Int32`.
+
+
+
+##### `Zero`
+
+
+**Stack:** &rArr; `0`
+
+Push the number `0`.
+
+
+
+##### `One`
+
+
+**Stack:** &rArr; `1`
+
+Push the number `1`.
+
+
+
+##### `Int8`
+
+**Operands:** `(int8_t val)`
+
+**Stack:** &rArr; `val`
+
+Push the `int8_t` immediate operand as an `Int32Value`.
+
+
+
+##### `Uint16`
+
+**Operands:** `(uint16_t val)`
+
+**Stack:** &rArr; `val`
+
+Push the `uint16_t` immediate operand as an `Int32Value`.
+
+
+
+##### `Uint24`
+
+**Operands:** `(uint24_t val)`
+
+**Stack:** &rArr; `val`
+
+Push the `uint24_t` immediate operand as an `Int32Value`.
+
+
+
+##### `Double`
+
+**Operands:** `(double val)`
+
+**Stack:** &rArr; `val`
+
+Push the 64-bit floating-point immediate operand as a `DoubleValue`.
+
+If the operand is a NaN, it must be the canonical NaN (see
+`JS::detail::CanonicalizeNaN`).
+
+
+
+##### `BigInt`
+
+**Operands:** `(uint32_t bigIntIndex)`
+
+**Stack:** &rArr; `bigint`
+
+Push the BigInt constant `script->getBigInt(bigIntIndex)`.
+
+
+
+##### `String`
+
+**Operands:** `(uint32_t atomIndex)`
+
+**Stack:** &rArr; `string`
+
+Push the string constant `script->getAtom(atomIndex)`.
+
+
+**Format:** JOF_ATOM
+
+##### `Symbol`
+
+**Operands:** `(uint8_t symbol (the JS::SymbolCode of the symbol to use))`
+
+**Stack:** &rArr; `symbol`
+
+Push a well-known symbol.
+
+`symbol` must be in range for `JS::SymbolCode`.
+
+
+
+### Expressions ###
+
+#### Unary operators ####
+
+
+
+##### `Void`
+
+
+**Stack:** `val` &rArr; `undefined`
+
+Pop the top value on the stack, discard it, and push `undefined`.
+
+Implements: [The `void` operator][1], step 3.
+
+[1]: https://tc39.es/ecma262/#sec-void-operator
+
+
+
+##### `Typeof`, `TypeofExpr`
+
+
+**Stack:** `val` &rArr; `(typeof val)`
+
+[The `typeof` operator][1].
+
+Infallible. The result is always a string that depends on the [type][2]
+of `val`.
+
+`JSOp::Typeof` and `JSOp::TypeofExpr` are the same except
+that--amazingly--`JSOp::Typeof` affects the behavior of an immediately
+*preceding* `JSOp::GetName` or `JSOp::GetGName` instruction! This is how
+we implement [`typeof`][1] step 2, making `typeof nonExistingVariable`
+return `"undefined"` instead of throwing a ReferenceError.
+
+In a global scope:
+
+-   `typeof x` compiles to `GetGName "x"; Typeof`.
+-   `typeof (0, x)` compiles to `GetGName "x"; TypeofExpr`.
+
+Emitting the same bytecode for these two expressions would be a bug.
+Per spec, the latter throws a ReferenceError if `x` doesn't exist.
+
+[1]: https://tc39.es/ecma262/#sec-typeof-operator
+[2]: https://tc39.es/ecma262/#sec-ecmascript-language-types
+
+
+**Format:** JOF_IC
+
+##### `Pos`
+
+
+**Stack:** `val` &rArr; `(+val)`
+
+[The unary `+` operator][1].
+
+`+val` doesn't do any actual math. It just calls [ToNumber][2](val).
+
+The conversion can call `.toString()`/`.valueOf()` methods and can
+throw. The result on success is always a Number. (Per spec, unary `-`
+supports BigInts, but unary `+` does not.)
+
+[1]: https://tc39.es/ecma262/#sec-unary-plus-operator
+[2]: https://tc39.es/ecma262/#sec-tonumber
+
+
+**Format:** JOF_IC
+
+##### `Neg`
+
+
+**Stack:** `val` &rArr; `(-val)`
+
+[The unary `-` operator][1].
+
+Convert `val` to a numeric value, then push `-val`. The conversion can
+call `.toString()`/`.valueOf()` methods and can throw. The result on
+success is always numeric.
+
+[1]: https://tc39.es/ecma262/#sec-unary-minus-operator
+
+
+**Format:** JOF_IC
+
+##### `BitNot`
+
+
+**Stack:** `val` &rArr; `(~val)`
+
+[The bitwise NOT operator][1] (`~`).
+
+`val` is converted to an integer, then bitwise negated. The conversion
+can call `.toString()`/`.valueOf()` methods and can throw. The result on
+success is always an Int32 or BigInt value.
+
+[1]: https://tc39.es/ecma262/#sec-bitwise-not-operator
+
+
+**Format:** JOF_IC
+
+##### `Not`
+
+
+**Stack:** `val` &rArr; `(!val)`
+
+[The logical NOT operator][1] (`!`).
+
+`val` is first converted with [ToBoolean][2], then logically
+negated. The result is always a boolean value. This does not call
+user-defined methods and can't throw.
+
+[1]: https://tc39.es/ecma262/#sec-logical-not-operator
+[2]: https://tc39.es/ecma262/#sec-toboolean
+
+
+**Format:** JOF_IC
+
+#### Binary operators ####
+
+
+
+##### `BitOr`, `BitXor`, `BitAnd`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+[Binary bitwise operations][1] (`|`, `^`, `&`).
+
+The arguments are converted to integers first. The conversion can call
+`.toString()`/`.valueOf()` methods and can throw. The result on success
+is always an Int32 or BigInt Value.
+
+[1]: https://tc39.es/ecma262/#sec-binary-bitwise-operators
+
+
+**Format:** JOF_IC
+
+##### `Eq`, `Ne`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+Loose equality operators (`==` and `!=`).
+
+Pop two values, compare them, and push the boolean result. The
+comparison may perform conversions that call `.toString()`/`.valueOf()`
+methods and can throw.
+
+Implements: [Abstract Equality Comparison][1].
+
+[1]: https://tc39.es/ecma262/#sec-abstract-equality-comparison
+
+
+**Format:** JOF_IC
+
+##### `StrictEq`, `StrictNe`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+Strict equality operators (`===` and `!==`).
+
+Pop two values, check whether they're equal, and push the boolean
+result. This does not call user-defined methods and can't throw
+(except possibly due to OOM while flattening a string).
+
+Implements: [Strict Equality Comparison][1].
+
+[1]: https://tc39.es/ecma262/#sec-strict-equality-comparison
+
+
+**Format:** JOF_IC
+
+##### `Lt`, `Gt`, `Le`, `Ge`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+Relative operators (`<`, `>`, `<=`, `>=`).
+
+Pop two values, compare them, and push the boolean result. The
+comparison may perform conversions that call `.toString()`/`.valueOf()`
+methods and can throw.
+
+Implements: [Relational Operators: Evaluation][1].
+
+[1]: https://tc39.es/ecma262/#sec-relational-operators-runtime-semantics-evaluation
+
+
+**Format:** JOF_IC
+
+##### `Instanceof`
+
+
+**Stack:** `value, target` &rArr; `(value instanceof target)`
+
+[The `instanceof` operator][1].
+
+This throws a `TypeError` if `target` is not an object. It calls
+`target[Symbol.hasInstance](value)` if the method exists. On success,
+the result is always a boolean value.
+
+[1]: https://tc39.es/ecma262/#sec-instanceofoperator
+
+
+**Format:** JOF_IC
+
+##### `In`
+
+
+**Stack:** `id, obj` &rArr; `(id in obj)`
+
+[The `in` operator][1].
+
+Push `true` if `obj` has a property with the key `id`. Otherwise push `false`.
+
+This throws a `TypeError` if `obj` is not an object. This can fire
+proxy hooks and can throw. On success, the result is always a boolean
+value.
+
+[1]: https://tc39.es/ecma262/#sec-relational-operators-runtime-semantics-evaluation
+
+
+**Format:** JOF_IC
+
+##### `Lsh`, `Rsh`, `Ursh`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+[Bitwise shift operators][1] (`<<`, `>>`, `>>>`).
+
+Pop two values, convert them to integers, perform a bitwise shift, and
+push the result.
+
+Conversion can call `.toString()`/`.valueOf()` methods and can throw.
+The result on success is always an Int32 or BigInt Value.
+
+[1]: https://tc39.es/ecma262/#sec-bitwise-shift-operators
+
+
+**Format:** JOF_IC
+
+##### `Add`
+
+
+**Stack:** `lval, rval` &rArr; `(lval + rval)`
+
+[The binary `+` operator][1].
+
+Pop two values, convert them to primitive values, add them, and push the
+result. If both values are numeric, add them; if either is a
+string, do string concatenation instead.
+
+The conversion can call `.toString()`/`.valueOf()` methods and can throw.
+
+[1]: https://tc39.es/ecma262/#sec-addition-operator-plus-runtime-semantics-evaluation
+
+
+**Format:** JOF_IC
+
+##### `Sub`
+
+
+**Stack:** `lval, rval` &rArr; `(lval - rval)`
+
+[The binary `-` operator][1].
+
+Pop two values, convert them to numeric values, subtract the top value
+from the other one, and push the result.
+
+The conversion can call `.toString()`/`.valueOf()` methods and can
+throw. On success, the result is always numeric.
+
+[1]: https://tc39.es/ecma262/#sec-subtraction-operator-minus-runtime-semantics-evaluation
+
+
+**Format:** JOF_IC
+
+##### `Inc`, `Dec`
+
+
+**Stack:** `val` &rArr; `(val +/- 1)`
+
+Add or subtract 1.
+
+`val` must already be a numeric value, such as the result of
+`JSOp::ToNumeric`.
+
+Implements: [The `++` and `--` operators][1], step 3 of each algorithm.
+
+[1]: https://tc39.es/ecma262/#sec-postfix-increment-operator
+
+
+**Format:** JOF_IC
+
+##### `Mul`, `Div`, `Mod`
+
+
+**Stack:** `lval, rval` &rArr; `(lval OP rval)`
+
+[The multiplicative operators][1] (`*`, `/`, `%`).
+
+Pop two values, convert them to numeric values, do math, and push the
+result.
+
+The conversion can call `.toString()`/`.valueOf()` methods and can
+throw. On success, the result is always numeric.
+
+[1]: https://tc39.es/ecma262/#sec-multiplicative-operators-runtime-semantics-evaluation
+
+
+**Format:** JOF_IC
+
+##### `Pow`
+
+
+**Stack:** `lval, rval` &rArr; `(lval ** rval)`
+
+[The exponentiation operator][1] (`**`).
+
+Pop two values, convert them to numeric values, do exponentiation, and
+push the result. The top value is the exponent.
+
+The conversion can call `.toString()`/`.valueOf()` methods and can
+throw. This throws a RangeError if both values are BigInts and the
+exponent is negative.
+
+[1]: https://tc39.es/ecma262/#sec-exp-operator
+
+
+**Format:** JOF_IC
+
+#### Conversions ####
+
+
+
+##### `ToId`
+
+
+**Stack:** `propertyNameValue` &rArr; `propertyKey`
+
+Convert a value to a property key.
+
+Implements: [ToPropertyKey][1], except that if the result would be the
+string representation of some integer in the range 0..2^31, we push the
+corresponding Int32 value instead. This is because the spec insists that
+array indices are strings, whereas for us they are integers.
+
+This is used for code like `++obj[index]`, which must do both a
+`JSOp::GetElem` and a `JSOp::SetElem` with the same property key. Both
+instructions would convert `index` to a property key for us, but the
+spec says to convert it only once.
+
+The conversion can call `.toString()`/`.valueOf()` methods and can
+throw.
+
+[1]: https://tc39.es/ecma262/#sec-topropertykey
+
+
+
+##### `ToNumeric`, `ToString`
+
+
+**Stack:** `val` &rArr; `ToNumeric(val)`
+
+Convert a value to a numeric value (a Number or BigInt).
+
+Implements: [ToNumeric][1](val).
+
+Note: This is used to implement [`++` and `--`][2]. Surprisingly, it's
+not possible to get the right behavior using `JSOp::Add` and `JSOp::Sub`
+alone. For one thing, `JSOp::Add` sometimes does string concatenation,
+while `++` always does numeric addition. More fundamentally, the result
+of evaluating `x--` is ToNumeric(old value of `x`), a value that the
+sequence `GetLocal "x"; One; Sub; SetLocal "x"` does not give us.
+
+[1]: https://tc39.es/ecma262/#sec-tonumeric
+[2]: https://tc39.es/ecma262/#sec-postfix-increment-operator
+
+
+**Format:** JOF_IC
+
+#### Other expressions ####
+
+
+
+##### `GlobalThis`
+
+
+**Stack:** &rArr; `this`
+
+Push the global `this` value. Not to be confused with the `globalThis`
+property on the global.
+
+This must be used only in scopes where `this` refers to the global
+`this`.
+
+
+
+##### `NewTarget`
+
+
+**Stack:** &rArr; `new.target`
+
+Push the value of `new.target`.
+
+The result is a constructor or `undefined`.
+
+This must be used only in scripts where `new.target` is allowed:
+non-arrow function scripts and other scripts that have a non-arrow
+function script on the scope chain.
+
+Implements: [GetNewTarget][1].
+
+[1]: https://tc39.es/ecma262/#sec-getnewtarget
+
+
+
+##### `DynamicImport`
+
+
+**Stack:** `moduleId` &rArr; `promise`
+
+Dynamic import of the module specified by the string value on the top of
+the stack.
+
+Implements: [Import Calls][1].
+
+[1]: https://tc39.es/ecma262/#sec-import-calls
+
+
+
+##### `ImportMeta`
+
+
+**Stack:** &rArr; `import.meta`
+
+Push the `import.meta` object.
+
+This must be used only in module code.
+
+
+
+### Objects ###
+
+#### Creating objects ####
+
+
+
+##### `NewInit`
+
+
+**Stack:** &rArr; `obj`
+
+Create and push a new object with no properties.
+
+
+**Format:** JOF_IC
+
+##### `NewObject`, `NewObjectWithGroup`
+
+**Operands:** `(uint32_t baseobjIndex)`
+
+**Stack:** &rArr; `obj`
+
+Create and push a new object of a predetermined shape.
+
+The new object has the shape of the template object
+`script->getObject(baseobjIndex)`. Subsequent `InitProp` instructions
+must fill in all slots of the new object before it is used in any other
+way.
+
+For `JSOp::NewObject`, the new object has a group based on the allocation
+site (or a new group if the template's group is a singleton). For
+`JSOp::NewObjectWithGroup`, the new object has the same group as the
+template object.
+
+
+**Format:** JOF_OBJECT, JOF_IC
+
+##### `Object`
+
+**Operands:** `(uint32_t objectIndex)`
+
+**Stack:** &rArr; `obj`
+
+Push a preconstructed object.
+
+Going one step further than `JSOp::NewObject`, this instruction doesn't
+just reuse the shape--it actually pushes the preconstructed object
+`script->getObject(objectIndex)` right onto the stack. The object must
+be a singleton `PlainObject` or `ArrayObject`.
+
+The spec requires that an *ObjectLiteral* or *ArrayLiteral* creates a
+new object every time it's evaluated, so this instruction must not be
+used anywhere it might be executed more than once.
+
+There's a shell-only option, `newGlobal({cloneSingletons: true})`, that
+makes this instruction do a deep copy of the object. A few tests use it.
+
+
+**Format:** JOF_OBJECT
+
+##### `ObjWithProto`
+
+
+**Stack:** `proto` &rArr; `obj`
+
+Create and push a new ordinary object with the provided [[Prototype]].
+
+This is used to create the `.prototype` object for derived classes.
+
+
+
+#### Defining properties ####
+
+
+
+##### `InitProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, val` &rArr; `obj`
+
+Define a data property on an object.
+
+`obj` must be an object.
+
+Implements: [CreateDataPropertyOrThrow][1] as used in
+[PropertyDefinitionEvaluation][2] of regular and shorthand
+*PropertyDefinition*s.
+
+   [1]: https://tc39.es/ecma262/#sec-createdatapropertyorthrow
+   [2]: https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-propertydefinitionevaluation
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+
+##### `InitHiddenProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, val` &rArr; `obj`
+
+Like `JSOp::InitProp`, but define a non-enumerable property.
+
+This is used to define class methods.
+
+Implements: [PropertyDefinitionEvaluation][1] for methods, steps 3 and
+4, when *enumerable* is false.
+
+   [1]: https://tc39.es/ecma262/#sec-method-definitions-runtime-semantics-propertydefinitionevaluation
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+
+##### `InitLockedProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, val` &rArr; `obj`
+
+Like `JSOp::InitProp`, but define a non-enumerable, non-writable,
+non-configurable property.
+
+This is used to define the `.prototype` property on classes.
+
+Implements: [MakeConstructor][1], step 8, when *writablePrototype* is
+false.
+
+   [1]: https://tc39.es/ecma262/#sec-makeconstructor
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+
+##### `InitElem`, `InitHiddenElem`
+
+
+**Stack:** `obj, id, val` &rArr; `obj`
+
+Define a data property on `obj` with property key `id` and value `val`.
+
+`obj` must be an object.
+
+Implements: [CreateDataPropertyOrThrow][1]. This instruction is used for
+object literals like `{0: val}` and `{[id]: val}`, and methods like
+`*[Symbol.iterator]() {}`.
+
+`JSOp::InitHiddenElem` is the same but defines a non-enumerable property,
+for class methods.
+
+   [1]: https://tc39.es/ecma262/#sec-createdatapropertyorthrow
+
+
+**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+
+##### `InitPropGetter`, `InitHiddenPropGetter`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, getter` &rArr; `obj`
+
+Define an accessor property on `obj` with the given `getter`.
+`nameIndex` gives the property name.
+
+`obj` must be an object and `getter` must be a function.
+
+`JSOp::InitHiddenPropGetter` is the same but defines a non-enumerable
+property, for getters in classes.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT
+
+##### `InitElemGetter`, `InitHiddenElemGetter`
+
+
+**Stack:** `obj, id, getter` &rArr; `obj`
+
+Define an accessor property on `obj` with property key `id` and the given `getter`.
+
+This is used to implement getters like `get [id]() {}` or `get 0() {}`.
+
+`obj` must be an object and `getter` must be a function.
+
+`JSOp::InitHiddenElemGetter` is the same but defines a non-enumerable
+property, for getters in classes.
+
+
+**Format:** JOF_ELEM, JOF_PROPINIT
+
+##### `InitPropSetter`, `InitHiddenPropSetter`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, setter` &rArr; `obj`
+
+Define an accessor property on `obj` with the given `setter`.
+
+This is used to implement ordinary setters like `set foo(v) {}`.
+
+`obj` must be an object and `setter` must be a function.
+
+`JSOp::InitHiddenPropSetter` is the same but defines a non-enumerable
+property, for setters in classes.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT
+
+##### `InitElemSetter`, `InitHiddenElemSetter`
+
+
+**Stack:** `obj, id, setter` &rArr; `obj`
+
+Define an accesssor property on `obj` with property key `id` and the
+given `setter`.
+
+This is used to implement setters with computed property keys or numeric
+keys.
+
+`JSOp::InitHiddenElemSetter` is the same but defines a non-enumerable
+property, for setters in classes.
+
+
+**Format:** JOF_ELEM, JOF_PROPINIT
+
+#### Accessing properties ####
+
+
+
+##### `GetProp`, `CallProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj` &rArr; `obj[name]`
+
+Get the value of the property `obj.name`. This can call getters and
+proxy traps.
+
+`JSOp::CallProp` is exactly like `JSOp::GetProp` but hints to the VM that we're
+getting a method in order to call it.
+
+Implements: [GetV][1], [GetValue][2] step 5.
+
+[1]: https://tc39.es/ecma262/#sec-getv
+[2]: https://tc39.es/ecma262/#sec-getvalue
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+
+##### `GetElem`, `CallElem`
+
+
+**Stack:** `obj, key` &rArr; `obj[key]`
+
+Get the value of the property `obj[key]`.
+
+`JSOp::CallElem` is exactly like `JSOp::GetElem` but hints to the VM that
+we're getting a method in order to call it.
+
+Implements: [GetV][1], [GetValue][2] step 5.
+
+[1]: https://tc39.es/ecma262/#sec-getv
+[2]: https://tc39.es/ecma262/#sec-getvalue
+
+
+**Format:** JOF_ELEM, JOF_TYPESET, JOF_IC
+
+##### `Length`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj` &rArr; `obj.length`
+
+Push the value of `obj.length`.
+
+`nameIndex` must be the index of the atom `"length"`. This then behaves
+exactly like `JSOp::GetProp`.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+
+##### `SetProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, val` &rArr; `val`
+
+Non-strict assignment to a property, `obj.name = val`.
+
+This throws a TypeError if `obj` is null or undefined. If it's a
+primitive value, the property is set on ToObject(`obj`), typically with
+no effect.
+
+Implements: [PutValue][1] step 6 for non-strict code.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+
+##### `StrictSetProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj, val` &rArr; `val`
+
+Like `JSOp::SetProp`, but for strict mode code. Throw a TypeError if
+`obj[key]` exists but is non-writable, if it's an accessor property with
+no setter, or if `obj` is a primitive value.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+
+##### `SetElem`
+
+
+**Stack:** `obj, key, val` &rArr; `val`
+
+Non-strict assignment to a property, `obj[key] = val`.
+
+Implements: [PutValue][1] step 6 for non-strict code.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+
+
+**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+
+##### `StrictSetElem`
+
+
+**Stack:** `obj, key, val` &rArr; `val`
+
+Like `JSOp::SetElem`, but for strict mode code. Throw a TypeError if
+`obj[key]` exists but is non-writable, if it's an accessor property with
+no setter, or if `obj` is a primitive value.
+
+
+**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+
+##### `DelProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj` &rArr; `succeeded`
+
+Delete a property from `obj`. Push true on success, false if the
+property existed but could not be deleted. This implements `delete
+obj.name` in non-strict code.
+
+Throws if `obj` is null or undefined. Can call proxy traps.
+
+Implements: [`delete obj.propname`][1] step 5 in non-strict code.
+
+[1]: https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_CHECKSLOPPY
+
+##### `StrictDelProp`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `obj` &rArr; `succeeded`
+
+Like `JSOp::DelProp`, but for strict mode code. Push `true` on success,
+else throw a TypeError.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_CHECKSTRICT
+
+##### `DelElem`
+
+
+**Stack:** `obj, key` &rArr; `succeeded`
+
+Delete the property `obj[key]` and push `true` on success, `false`
+if the property existed but could not be deleted.
+
+This throws if `obj` is null or undefined. Can call proxy traps.
+
+Implements: [`delete obj[key]`][1] step 5 in non-strict code.
+
+[1]: https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
+
+
+**Format:** JOF_ELEM, JOF_CHECKSLOPPY
+
+##### `StrictDelElem`
+
+
+**Stack:** `obj, key` &rArr; `succeeded`
+
+Like `JSOp::DelElem, but for strict mode code. Push `true` on success,
+else throw a TypeError.
+
+
+**Format:** JOF_ELEM, JOF_CHECKSTRICT
+
+##### `HasOwn`
+
+
+**Stack:** `id, obj` &rArr; `(obj.hasOwnProperty(id))`
+
+Push true if `obj` has an own property `id`.
+
+Note that `obj` is the top value, like `JSOp::In`.
+
+This opcode is not used for normal JS. Self-hosted code uses it by
+calling the intrinsic `hasOwn(id, obj)`. For example,
+`Object.prototype.hasOwnProperty` is implemented this way (see
+js/src/builtin/Object.js).
+
+
+**Format:** JOF_IC
+
+#### Super ####
+
+
+
+##### `SuperBase`
+
+
+**Stack:** `callee` &rArr; `superBase`
+
+Push the SuperBase of the method `callee`. The SuperBase is
+`callee.[[HomeObject]].[[GetPrototypeOf]]()`, the object where `super`
+property lookups should begin.
+
+`callee` must be a function that has a HomeObject that's an object,
+typically produced by `JSOp::Callee` or `JSOp::EnvCallee`.
+
+Implements: [GetSuperBase][1], except that instead of the environment,
+the argument supplies the callee.
+
+[1]: https://tc39.es/ecma262/#sec-getsuperbase
+
+
+
+##### `GetPropSuper`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `receiver, obj` &rArr; `super.name`
+
+Get the value of `receiver.name`, starting the property search at `obj`.
+In spec terms, `obj.[[Get]](name, receiver)`.
+
+Implements: [GetValue][1] for references created by [`super.name`][2].
+The `receiver` is `this` and `obj` is the SuperBase of the enclosing
+method.
+
+[1]: https://tc39.es/ecma262/#sec-getvalue
+[2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+
+##### `GetElemSuper`
+
+
+**Stack:** `receiver, key, obj` &rArr; `super[key]`
+
+Get the value of `receiver[key]`, starting the property search at `obj`.
+In spec terms, `obj.[[Get]](key, receiver)`.
+
+Implements: [GetValue][1] for references created by [`super[key]`][2]
+(where the `receiver` is `this` and `obj` is the SuperBase of the enclosing
+method); [`Reflect.get(obj, key, receiver)`][3].
+
+[1]: https://tc39.es/ecma262/#sec-getvalue
+[2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+[3]: https://tc39.es/ecma262/#sec-reflect.get
+
+
+**Format:** JOF_ELEM, JOF_TYPESET, JOF_IC
+
+##### `SetPropSuper`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `receiver, obj, val` &rArr; `val`
+
+Assign `val` to `receiver.name`, starting the search for an existing
+property at `obj`. In spec terms, `obj.[[Set]](name, val, receiver)`.
+
+Implements: [PutValue][1] for references created by [`super.name`][2] in
+non-strict code. The `receiver` is `this` and `obj` is the SuperBase of
+the enclosing method.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+[2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSLOPPY
+
+##### `StrictSetPropSuper`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `receiver, obj, val` &rArr; `val`
+
+Like `JSOp::SetPropSuper`, but for strict mode code.
+
+
+**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSTRICT
+
+##### `SetElemSuper`
+
+
+**Stack:** `receiver, key, obj, val` &rArr; `val`
+
+Assign `val` to `receiver[key]`, strating the search for an existing
+property at `obj`. In spec terms, `obj.[[Set]](key, val, receiver)`.
+
+Implements: [PutValue][1] for references created by [`super[key]`][2] in
+non-strict code. The `receiver` is `this` and `obj` is the SuperBase of
+the enclosing method.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+[2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+
+
+**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSLOPPY
+
+##### `StrictSetElemSuper`
+
+
+**Stack:** `receiver, key, obj, val` &rArr; `val`
+
+Like `JSOp::SetElemSuper`, but for strict mode code.
+
+
+**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSTRICT
+
+#### Enumeration ####
+
+
+
+##### `Iter`
+
+
+**Stack:** `val` &rArr; `iter`
+
+Set up a for-in loop by pushing a `PropertyIteratorObject` over the
+enumerable properties of `val`.
+
+Implements: [ForIn/OfHeadEvaluation][1] step 6,
+[EnumerateObjectProperties][1]. (The spec refers to an "Iterator object"
+with a `next` method, but notes that it "is never directly accessible"
+to scripts. The object we use for this has no public methods.)
+
+If `val` is null or undefined, this pushes an empty iterator.
+
+The `iter` object pushed by this instruction must not be used or removed
+from the stack except by `JSOp::MoreIter` and `JSOp::EndIter`, or by error
+handling.
+
+The script's `JSScript::trynotes()` must mark the body of the `for-in`
+loop, i.e. exactly those instructions that begin executing with `iter`
+on the stack, starting with the next instruction (always
+`JSOp::LoopHead`). Code must not jump into or out of this region: control
+can enter only by executing `JSOp::Iter` and can exit only by executing a
+`JSOp::EndIter` or by exception unwinding. (A `JSOp::EndIter` is always
+emitted at the end of the loop, and extra copies are emitted on "exit
+slides", where a `break`, `continue`, or `return` statement exits the
+loop.)
+
+Typically a single try note entry marks the contiguous chunk of bytecode
+from the instruction after `JSOp::Iter` to `JSOp::EndIter` (inclusive);
+but if that range contains any instructions on exit slides, after a
+`JSOp::EndIter`, then those must be correctly noted as *outside* the
+loop.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofheadevaluation-tdznames-expr-iterationkind
+[2]: https://tc39.es/ecma262/#sec-enumerate-object-properties
+
+
+**Format:** JOF_IC
+
+##### `MoreIter`
+
+
+**Stack:** `iter` &rArr; `iter, name`
+
+Get the next property name for a for-in loop.
+
+`iter` must be a `PropertyIteratorObject` produced by `JSOp::Iter`.  This
+pushes the property name for the next loop iteration, or
+`MagicValue(JS_NO_ITER_VALUE)` if there are no more enumerable
+properties to iterate over. The magic value must be used only by
+`JSOp::IsNoIter` and `JSOp::EndIter`.
+
+
+
+##### `IsNoIter`
+
+
+**Stack:** `val` &rArr; `val, done`
+
+Test whether the value on top of the stack is
+`MagicValue(JS_NO_ITER_VALUE)` and push the boolean result.
+
+
+
+##### `IterNext`
+
+
+**Stack:** `val` &rArr; `val`
+
+No-op instruction to hint to IonBuilder that the value on top of the
+stack is the string key in a for-in loop.
+
+
+
+##### `EndIter`
+
+
+**Stack:** `iter, iterval` &rArr;
+
+Exit a for-in loop, closing the iterator.
+
+`iter` must be a `PropertyIteratorObject` pushed by `JSOp::Iter`.
+
+
+
+#### Iteration ####
+
+
+
+##### `CheckIsObj`
+
+**Operands:** `(CheckIsObjectKind kind)`
+
+**Stack:** `result` &rArr; `result`
+
+Check that the top value on the stack is an object, and throw a
+TypeError if not. `kind` is used only to generate an appropriate error
+message.
+
+Implements: [GetIterator][1] step 5, [IteratorNext][2] step 3. Both
+operations call a JS method which scripts can define however they want,
+so they check afterwards that the method returned an object.
+
+[1]: https://tc39.es/ecma262/#sec-getiterator
+[2]: https://tc39.es/ecma262/#sec-iteratornext
+
+
+
+##### `CheckObjCoercible`
+
+
+**Stack:** `val` &rArr; `val`
+
+Throw a TypeError if `val` is `null` or `undefined`.
+
+Implements: [RequireObjectCoercible][1]. But most instructions that
+require an object will perform this check for us, so of the dozens of
+calls to RequireObjectCoercible in the spec, we need this instruction
+only for [destructuring assignment][2] and [initialization][3].
+
+[1]: https://tc39.es/ecma262/#sec-requireobjectcoercible
+[2]: https://tc39.es/ecma262/#sec-runtime-semantics-destructuringassignmentevaluation
+[3]: https://tc39.es/ecma262/#sec-destructuring-binding-patterns-runtime-semantics-bindinginitialization
+
+
+
+##### `ToAsyncIter`
+
+
+**Stack:** `iter, next` &rArr; `asynciter`
+
+Create and push an async iterator wrapping the sync iterator `iter`.
+`next` should be `iter`'s `.next` method.
+
+Implements: [CreateAsyncToSyncIterator][1]. The spec says this operation
+takes one argument, but that argument is a Record with two relevant
+fields, `[[Iterator]]` and `[[NextMethod]]`.
+
+Used for `for await` loops.
+
+[1]: https://tc39.es/ecma262/#sec-createasyncfromsynciterator
+
+
+
+#### SetPrototype ####
+
+
+
+##### `MutateProto`
+
+
+**Stack:** `obj, protoVal` &rArr; `obj`
+
+Set the prototype of `obj`.
+
+`obj` must be an object.
+
+Implements: [B.3.1 __proto__ Property Names in Object Initializers][1], step 7.a.
+
+[1]: https://tc39.es/ecma262/#sec-__proto__-property-names-in-object-initializers
+
+
+
+#### Array literals ####
+
+
+
+##### `NewArray`
+
+**Operands:** `(uint32_t length)`
+
+**Stack:** &rArr; `array`
+
+Create and push a new Array object with the given `length`,
+preallocating enough memory to hold that many elements.
+
+
+**Format:** JOF_IC
+
+##### `InitElemArray`
+
+**Operands:** `(uint32_t index)`
+
+**Stack:** `array, val` &rArr; `array`
+
+Initialize an array element `array[index]` with value `val`.
+
+`val` may be `MagicValue(JS_ELEMENTS_HOLE)`. If it is, this does nothing.
+
+This never calls setters or proxy traps.
+
+`array` must be an Array object created by `JSOp::NewArray` with length >
+`index`, and never used except by `JSOp::InitElemArray`.
+
+Implements: [ArrayAccumulation][1], the third algorithm, step 4, in the
+common case where *nextIndex* is known.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-arrayaccumulation
+
+
+**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+
+##### `InitElemInc`
+
+
+**Stack:** `array, index, val` &rArr; `array, (index + 1)`
+
+Initialize an array element `array[index++]` with value `val`.
+
+`val` may be `MagicValue(JS_ELEMENTS_HOLE)`. If it is, no element is
+defined, but the array length and the stack value `index` are still
+incremented.
+
+This never calls setters or proxy traps.
+
+`array` must be an Array object created by `JSOp::NewArray` and never used
+except by `JSOp::InitElemArray` and `JSOp::InitElemInc`.
+
+`index` must be an integer, `0 <= index <= INT32_MAX`. If `index` is
+`INT32_MAX`, this throws a RangeError.
+
+This instruction is used when an array literal contains a
+*SpreadElement*. In `[a, ...b, c]`, `InitElemArray 0` is used to put
+`a` into the array, but `InitElemInc` is used for the elements of `b`
+and for `c`.
+
+Implements: Several steps in [ArrayAccumulation][1] that call
+CreateDataProperty, set the array length, and/or increment *nextIndex*.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-arrayaccumulation
+
+
+**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+
+##### `Hole`
+
+
+**Stack:** &rArr; `hole`
+
+Push `MagicValue(JS_ELEMENTS_HOLE)`, representing an *Elision* in an
+array literal (like the missing property 0 in the array `[, 1]`).
+
+This magic value must be used only by `JSOp::InitElemArray` or
+`JSOp::InitElemInc`.
+
+
+
+##### `NewArrayCopyOnWrite`
+
+**Operands:** `(uint32_t objectIndex)`
+
+**Stack:** &rArr; `array`
+
+Create and push a new array that shares the elements of a template
+object.
+
+`script->getObject(objectIndex)` must be a copy-on-write array whose
+elements are all primitive values.
+
+This is an optimization. This single instruction implements an entire
+array literal, saving run time, code, and memory compared to
+`JSOp::NewArray` and a series of `JSOp::InitElem` instructions.
+
+
+**Format:** JOF_OBJECT
+
+#### RegExp literals ####
+
+
+
+##### `RegExp`
+
+**Operands:** `(uint32_t regexpIndex)`
+
+**Stack:** &rArr; `regexp`
+
+Clone and push a new RegExp object.
+
+Implements: [Evaluation for *RegularExpressionLiteral*][1].
+
+[1]: https://tc39.es/ecma262/#sec-regular-expression-literals-runtime-semantics-evaluation
+
+
+
+### Functions ###
+
+#### Creating functions ####
+
+
+
+##### `Lambda`
+
+**Operands:** `(uint32_t funcIndex)`
+
+**Stack:** &rArr; `fn`
+
+Push a function object.
+
+This clones the function unless it's a singleton; see
+`CanReuseFunctionForClone`. The new function inherits the current
+environment chain.
+
+Used to create most JS functions. Notable exceptions are arrow functions
+and derived or default class constructors.
+
+The function indicated by `funcIndex` must be a non-arrow function.
+
+Implements: [InstantiateFunctionObject][1], [Evaluation for
+*FunctionExpression*][2], and so on.
+
+[1]: https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-instantiatefunctionobject
+[2]: https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
+
+
+**Format:** JOF_OBJECT
+
+##### `LambdaArrow`
+
+**Operands:** `(uint32_t funcIndex)`
+
+**Stack:** `newTarget` &rArr; `arrowFn`
+
+Push a new arrow function.
+
+`newTarget` matters only if the arrow function uses the expression
+`new.target`. It should be the current value of `new.target`, so that
+the arrow function inherits `new.target` from the enclosing scope. (If
+`new.target` is illegal here, the value doesn't matter; use `null`.)
+
+The function indicated by `funcIndex` must be an arrow function.
+
+
+**Format:** JOF_OBJECT
+
+##### `SetFunName`
+
+**Operands:** `(FunctionPrefixKind prefixKind)`
+
+**Stack:** `fun, name` &rArr; `fun`
+
+Set the name of a function.
+
+`fun` must be a function object. `name` must be a string, Int32 value,
+or symbol (like the result of `JSOp::ToId`).
+
+Implements: [SetFunctionName][1], used e.g. to name methods with
+computed property names.
+
+[1]: https://tc39.es/ecma262/#sec-setfunctionname
+
+
+
+##### `InitHomeObject`
+
+
+**Stack:** `fun, homeObject` &rArr; `fun`
+
+Initialize the home object for functions with super bindings.
+
+`fun` must be a method, getter, or setter, so that it has a
+[[HomeObject]] slot. `homeObject` must be a plain object or (for static
+methods) a constructor.
+
+
+
+#### Creating constructors ####
+
+
+
+##### `CheckClassHeritage`
+
+
+**Stack:** `baseClass` &rArr; `baseClass`
+
+Throw a TypeError if `baseClass` isn't either `null` or a constructor.
+
+Implements: [ClassDefinitionEvaluation][1] step 6.f.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+
+
+
+##### `FunWithProto`
+
+**Operands:** `(uint32_t funcIndex)`
+
+**Stack:** `proto` &rArr; `obj`
+
+Like `JSOp::Lambda`, but using `proto` as the new function's
+`[[Prototype]]` (or `%FunctionPrototype%` if `proto` is `null`).
+
+`proto` must be either a constructor or `null`. We use
+`JSOp::CheckClassHeritage` to check.
+
+This is used to create the constructor for a derived class.
+
+Implements: [ClassDefinitionEvaluation][1] steps 6.e.ii, 6.g.iii, and
+12 for derived classes.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+
+
+**Format:** JOF_OBJECT
+
+##### `ClassConstructor`
+
+**Operands:** `(uint32_t nameIndex, uint32_t sourceStart, uint32_t sourceEnd)`
+
+**Stack:** &rArr; `constructor`
+
+Create and push a default constructor for a base class.
+
+A default constructor behaves like `constructor() {}`.
+
+Implements: [ClassDefinitionEvaluation for *ClassTail*][1], steps
+10.b. and 12-17.
+
+The `sourceStart`/`sourceEnd` offsets are the start/end offsets of the
+class definition in the source buffer, used for `toString()`. They must
+be valid offsets into the source buffer, measured in code units, such
+that `scriptSource->substring(cx, start, end)` is valid.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+
+
+**Format:** JOF_CLASS_CTOR
+
+##### `DerivedConstructor`
+
+**Operands:** `(uint32_t nameIndex, uint32_t sourceStart, uint32_t sourceEnd)`
+
+**Stack:** `proto` &rArr; `constructor`
+
+Create and push a default constructor for a derived class.
+
+A default derived-class constructor behaves like
+`constructor(...args) { super(...args); }`.
+
+Implements: [ClassDefinitionEvaluation for *ClassTail*][1], steps
+10.a. and 12-17.
+
+`sourceStart` and `sourceEnd` follow the same rules as for
+`JSOp::ClassConstructor`.
+
+[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+
+
+**Format:** JOF_CLASS_CTOR
+
+##### `FunctionProto`
+
+
+**Stack:** &rArr; `%FunctionPrototype%`
+
+Pushes the current global's FunctionPrototype.
+
+`kind` must be in range for `JSProtoKey` (and must not be
+`JSProto_LIMIT`).
+
+
+
+#### Calls ####
+
+
+
+##### `Call`, `CallIter`, `FunApply`, `FunCall`, `CallIgnoresRv`
+
+**Operands:** `(uint16_t argc)`
+
+**Stack:** `callee, this, args[0], ..., args[argc-1]` &rArr; `rval`
+
+Invoke `callee` with `this` and `args`, and push the return value. Throw
+a TypeError if `callee` isn't a function.
+
+`JSOp::CallIter` is used for implicit calls to @@iterator methods, to
+ensure error messages are formatted with `JSMSG_NOT_ITERABLE` ("x is not
+iterable") rather than `JSMSG_NOT_FUNCTION` ("x[Symbol.iterator] is not
+a function"). The `argc` operand must be 0 for this variation.
+
+`JSOp::FunApply` hints to the VM that this is likely a call to the
+builtin method `Function.prototype.apply`, an easy optimization target.
+
+`JSOp::FunCall` similarly hints to the VM that the callee is likely
+`Function.prototype.call`.
+
+`JSOp::CallIgnoresRv` hints to the VM that the return value is ignored.
+This allows alternate faster implementations to be used that avoid
+unnecesary allocations.
+
+Implements: [EvaluateCall][1] steps 4, 5, and 7.
+
+[1]: https://tc39.es/ecma262/#sec-evaluatecall
+
+
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_IC
+
+##### `SpreadCall`
+
+
+**Stack:** `callee, this, args` &rArr; `rval`
+
+Like `JSOp::Call`, but the arguments are provided in an array rather than
+a span of stack slots. Used to implement spread-call syntax:
+`f(...args)`.
+
+`args` must be an Array object containing the actual arguments. The
+array must be packed (dense and free of holes; see IsPackedArray).
+This can be ensured by creating the array with `JSOp::NewArray` and
+populating it using `JSOp::InitElemArray`.
+
+
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_IC
+
+##### `OptimizeSpreadCall`
+
+
+**Stack:** `arr` &rArr; `arr, optimized`
+
+Push true if `arr` is an array object that can be passed directly as the
+`args` argument to `JSOp::SpreadCall`.
+
+This instruction and the branch around the iterator loop are emitted
+only when `arr` is itself a rest parameter, as in `(...arr) =>
+f(...arr)`, a strong hint that it's a packed Array whose prototype is
+`Array.prototype`.
+
+See `js::OptimizeSpreadCall`.
+
+
+
+##### `Eval`
+
+**Operands:** `(uint16_t argc)`
+
+**Stack:** `callee, this, args[0], ..., args[argc-1]` &rArr; `rval`
+
+Perform a direct eval in the current environment if `callee` is the
+builtin `eval` function, otherwise follow same behaviour as `JSOp::Call`.
+
+All direct evals use one of the JSOp::*Eval instructions here and these
+opcodes are only used when the syntactic conditions for a direct eval
+are met. If the builtin `eval` function is called though other means, it
+becomes an indirect eval.
+
+Direct eval causes all bindings in *enclosing* non-global scopes to be
+marked "aliased". The optimization that puts bindings in stack slots has
+to prove that the bindings won't need to be captured by closures or
+accessed using `JSOp::{Get,Bind,Set,Del}Name` instructions. Direct eval
+makes that analysis impossible.
+
+The instruction immediately following any `JSOp::*Eval` instruction must
+be `JSOp::Lineno`.
+
+Implements: [Function Call Evaluation][1], steps 5-7 and 9, when the
+syntactic critera for direct eval in step 6 are all met.
+
+[1]: https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
+
+
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_CHECKSLOPPY, JOF_IC
+
+##### `SpreadEval`
+
+
+**Stack:** `callee, this, args` &rArr; `rval`
+
+Spread-call variant of `JSOp::Eval`.
+
+See `JSOp::SpreadCall` for restrictions on `args`.
+
+
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_CHECKSLOPPY, JOF_IC
+
+##### `StrictEval`
+
+**Operands:** `(uint16_t argc)`
+
+**Stack:** `evalFn, this, args[0], ..., args[argc-1]` &rArr; `rval`
+
+Like `JSOp::Eval`, but for strict mode code.
+
+
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_CHECKSTRICT, JOF_IC
+
+##### `StrictSpreadEval`
+
+
+**Stack:** `callee, this, args` &rArr; `rval`
+
+Spread-call variant of `JSOp::StrictEval`.
+
+See `JSOp::SpreadCall` for restrictions on `args`.
+
+
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_CHECKSTRICT, JOF_IC
+
+##### `ImplicitThis`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `this`
+
+Push the implicit `this` value for an unqualified function call, like
+`foo()`. `nameIndex` gives the name of the function we're calling.
+
+The result is always `undefined` except when the name refers to a `with`
+binding.  For example, in `with (date) { getFullYear(); }`, the
+implicit `this` passed to `getFullYear` is `date`, not `undefined`.
+
+This walks the run-time environment chain looking for the environment
+record that contains the function. If the function call is not inside a
+`with` statement, use `JSOp::GImplicitThis` instead. If the function call
+definitely refers to a local binding, use `JSOp::Undefined`.
+
+Implements: [EvaluateCall][1] step 1.b. But not entirely correctly.
+See [bug 1166408][2].
+
+[1]: https://tc39.es/ecma262/#sec-evaluatecall
+[2]: https://bugzilla.mozilla.org/show_bug.cgi?id=1166408
+
+
+**Format:** JOF_ATOM
+
+##### `GImplicitThis`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `this`
+
+Like `JSOp::ImplicitThis`, but the name must not be bound in any local
+environments.
+
+The result is always `undefined` except when the name refers to a
+binding in a non-syntactic `with` environment.
+
+Note: The frontend has to emit `JSOp::GImplicitThis` (and not
+`JSOp::Undefined`) for global unqualified function calls, even when
+`CompileOptions::nonSyntacticScope == false`, because later
+`js::CloneGlobalScript` can be called with `ScopeKind::NonSyntactic` to
+clone the script into a non-syntactic environment, with the bytecode
+reused, unchanged.
+
+
+**Format:** JOF_ATOM
+
+##### `CallSiteObj`
+
+**Operands:** `(uint32_t objectIndex)`
+
+**Stack:** &rArr; `callSiteObj`
+
+Push the call site object for a tagged template call.
+
+`script->getObject(objectIndex)` is the call site object;
+`script->getObject(objectIndex + 1)` is the raw object.
+
+The first time this instruction runs for a given template, it assembles
+the final value, defining the `.raw` property on the call site object
+and freezing both objects.
+
+Implements: [GetTemplateObject][1], steps 4 and 12-16.
+
+[1]: https://tc39.es/ecma262/#sec-gettemplateobject
+
+
+**Format:** JOF_OBJECT
+
+##### `IsConstructing`
+
+
+**Stack:** &rArr; `JS_IS_CONSTRUCTING`
+
+Push `MagicValue(JS_IS_CONSTRUCTING)`.
+
+This magic value is a required argument to the `JSOp::New` and
+`JSOp::SuperCall` instructions and must not be used any other way.
+
+
+
+##### `New`, `SuperCall`
+
+**Operands:** `(uint16_t argc)`
+
+**Stack:** `callee, isConstructing, args[0], ..., args[argc-1], newTarget` &rArr; `rval`
+
+Invoke `callee` as a constructor with `args` and `newTarget`, and push
+the return value. Throw a TypeError if `callee` isn't a constructor.
+
+`isConstructing` must be the value pushed by `JSOp::IsConstructing`.
+
+`JSOp::SuperCall` behaves exactly like `JSOp::New`, but is used for
+*SuperCall* expressions, to allow JITs to distinguish them from `new`
+expressions.
+
+Implements: [EvaluateConstruct][1] steps 7 and 8.
+
+[1]: https://tc39.es/ecma262/#sec-evaluatenew
+
+
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_CONSTRUCT, JOF_TYPESET, JOF_IC
+
+##### `SpreadNew`, `SpreadSuperCall`
+
+
+**Stack:** `callee, isConstructing, args, newTarget` &rArr; `rval`
+
+Spread-call variant of `JSOp::New`.
+
+Invokes `callee` as a constructor with `args` and `newTarget`, and
+pushes the return value onto the stack.
+
+`isConstructing` must be the value pushed by `JSOp::IsConstructing`.
+See `JSOp::SpreadCall` for restrictions on `args`.
+
+`JSOp::SpreadSuperCall` behaves exactly like `JSOp::SpreadNew`, but is
+used for *SuperCall* expressions.
+
+
+**Format:** JOF_INVOKE, JOF_CONSTRUCT, JOF_SPREAD, JOF_TYPESET, JOF_IC
+
+##### `SuperFun`
+
+
+**Stack:** `callee` &rArr; `superFun`
+
+Push the prototype of `callee` in preparation for calling `super()`.
+
+`callee` must be a derived class constructor.
+
+Implements: [GetSuperConstructor][1], steps 4-7.
+
+[1]: https://tc39.es/ecma262/#sec-getsuperconstructor
+
+
+
+##### `CheckThisReinit`
+
+
+**Stack:** `thisval` &rArr; `thisval`
+
+Throw a ReferenceError if `thisval` is not
+`MagicValue(JS_UNINITIALIZED_LEXICAL)`. Used in derived class
+constructors to prohibit calling `super` more than once.
+
+Implements: [BindThisValue][1], step 3.
+
+[1]: https://tc39.es/ecma262/#sec-bindthisvalue
+
+
+
+#### Generators and async functions ####
+
+
+
+##### `Generator`
+
+
+**Stack:** &rArr; `gen`
+
+Create and push a generator object for the current frame.
+
+This instruction must appear only in scripts for generators, async
+functions, and async generators. There must not already be a generator
+object for the current frame (that is, this instruction must execute at
+most once per generator or async call).
+
+
+
+##### `InitialYield`
+
+**Operands:** `(uint24_t resumeIndex)`
+
+**Stack:** `gen` &rArr; `rval, gen, resumeKind`
+
+Suspend the current generator and return to the caller.
+
+When a generator is called, its script starts running, like any other JS
+function, because [FunctionDeclarationInstantation][1] and other
+[generator object setup][2] are implemented mostly in bytecode. However,
+the *FunctionBody* of the generator is not supposed to start running
+until the first `.next()` call, so after setup the script suspends
+itself: the "initial yield".
+
+Later, when resuming execution, `rval`, `gen` and `resumeKind` will
+receive the values passed in by `JSOp::Resume`. `resumeKind` is the
+`GeneratorResumeKind` stored as an Int32 value.
+
+This instruction must appear only in scripts for generators and async
+generators. `gen` must be the generator object for the current frame. It
+must not have been previously suspended. The resume point indicated by
+`resumeIndex` must be the next instruction in the script, which must be
+`AfterYield`.
+
+Implements: [GeneratorStart][3], steps 4-7.
+
+[1]: https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
+[2]: https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluatebody
+[3]: https://tc39.es/ecma262/#sec-generatorstart
+
+
+**Format:** JOF_RESUMEINDEX
+
+##### `AfterYield`
+
+**Operands:** `(uint32_t icIndex)`
+
+
+Bytecode emitted after `yield` expressions. This is useful for the
+Debugger and `AbstractGeneratorObject::isAfterYieldOrAwait`. It's
+treated as jump target op so that the Baseline Interpreter can
+efficiently restore the frame's interpreterICEntry when resuming a
+generator.
+
+The preceding instruction in the script must be `Yield`, `InitialYield`,
+or `Await`.
+
+
+**Format:** JOF_ICINDEX
+
+##### `FinalYieldRval`
+
+
+**Stack:** `gen` &rArr;
+
+Suspend and close the current generator, async function, or async
+generator.
+
+`gen` must be the generator object for the current frame.
+
+If the current function is a non-async generator, then the value in the
+frame's return value slot is returned to the caller. It should be an
+object of the form `{value: returnValue, done: true}`.
+
+If the current function is an async function or async generator, the
+frame's return value slot must contain the current frame's result
+promise, which must already be resolved or rejected.
+
+
+
+##### `Yield`
+
+**Operands:** `(uint24_t resumeIndex)`
+
+**Stack:** `rval1, gen` &rArr; `rval2, gen, resumeKind`
+
+Suspend execution of the current generator or async generator, returning
+`rval1`.
+
+For non-async generators, `rval1` should be an object of the form
+`{value: valueToYield, done: true}`. For async generators, `rval1`
+should be the value to yield, and the caller is responsible for creating
+the iterator result object (under `js::AsyncGeneratorYield`).
+
+This instruction must appear only in scripts for generators and async
+generators. `gen` must be the generator object for the current stack
+frame. The resume point indicated by `resumeIndex` must be the next
+instruction in the script, which must be `AfterYield`.
+
+When resuming execution, `rval2`, `gen` and `resumeKind` receive the
+values passed in by `JSOp::Resume`.
+
+Implements: [GeneratorYield][1] and [AsyncGeneratorYield][2].
+
+[1]: https://tc39.es/ecma262/#sec-generatoryield
+[2]: https://tc39.es/ecma262/#sec-asyncgeneratoryield
+
+
+**Format:** JOF_RESUMEINDEX
+
+##### `IsGenClosing`
+
+
+**Stack:** `val` &rArr; `val, res`
+
+Pushes a boolean indicating whether the top of the stack is
+`MagicValue(JS_GENERATOR_CLOSING)`.
+
+
+
+##### `AsyncAwait`
+
+
+**Stack:** `value, gen` &rArr; `promise`
+
+Arrange for this async function to resume asynchronously when `value`
+becomes resolved.
+
+This is the last thing an async function does before suspending for an
+`await` expression. It coerces the awaited `value` to a promise and
+effectively calls `.then()` on it, passing handler functions that will
+resume this async function call later. See `js::AsyncFunctionAwait`.
+
+This instruction must appear only in non-generator async function
+scripts. `gen` must be the internal generator object for the current
+frame. After this instruction, the script should suspend itself with
+`Await` (rather than exiting any other way).
+
+The result `promise` is the async function's result promise,
+`gen->as<AsyncFunctionGeneratorObject>().promise()`.
+
+Implements: [Await][1], steps 2-9.
+
+[1]: https://tc39.github.io/ecma262/#await
+
+
+
+##### `AsyncResolve`
+
+**Operands:** `(AsyncFunctionResolveKind fulfillOrReject)`
+
+**Stack:** `valueOrReason, gen` &rArr; `promise`
+
+Resolve or reject the current async function's result promise with
+'valueOrReason'.
+
+This instruction must appear only in non-generator async function
+scripts. `gen` must be the internal generator object for the current
+frame. This instruction must run at most once per async function call,
+as resolving/rejecting an already resolved/rejected promise is not
+permitted.
+
+The result `promise` is the async function's result promise,
+`gen->as<AsyncFunctionGeneratorObject>().promise()`.
+
+Implements: [AsyncFunctionStart][1], step 4.d.i. and 4.e.i.
+
+[1]: https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
+
+
+
+##### `Await`
+
+**Operands:** `(uint24_t resumeIndex)`
+
+**Stack:** `promise, gen` &rArr; `resolved, gen, resumeKind`
+
+Suspend the current frame for an `await` expression.
+
+This instruction must appear only in scripts for async functions and
+async generators. `gen` must be the internal generator object for the
+current frame.
+
+This returns `promise` to the caller. Later, when this async call is
+resumed, `resolved`, `gen` and `resumeKind` receive the values passed in
+by `JSOp::Resume`, and execution continues at the next instruction,
+which must be `AfterYield`.
+
+This instruction is used in two subtly different ways.
+
+1.  In async functions:
+
+        ...                          # valueToAwait
+        GetAliasedVar ".generator"   # valueToAwait gen
+        AsyncAwait                   # resultPromise
+        GetAliasedVar ".generator"   # resultPromise gen
+        Await                        # resolved gen resumeKind
+        AfterYield
+
+    `AsyncAwait` arranges for this frame to be resumed later and pushes
+    its result promise. `Await` then suspends the frame and removes it
+    from the stack, returning the result promise to the caller. (If this
+    async call hasn't awaited before, the caller may be user code.
+    Otherwise, the caller is self-hosted code using `resumeGenerator`.)
+
+2.  In async generators:
+
+        ...                          # valueToAwait
+        GetAliasedVar ".generator"   # valueToAwait gen
+        Await                        # resolved gen resumeKind
+        AfterYield
+
+    `AsyncAwait` is not used, so (1) the value returned to the caller by
+    `Await` is `valueToAwait`, not `resultPromise`; and (2) the caller
+    is responsible for doing the async-generator equivalent of
+    `AsyncAwait` (namely, `js::AsyncGeneratorAwait`, called from
+    `js::AsyncGeneratorResume` after `js::CallSelfHostedFunction`
+    returns).
+
+Implements: [Await][1], steps 10-12.
+
+[1]: https://tc39.es/ecma262/#await
+
+
+**Format:** JOF_RESUMEINDEX
+
+##### `TrySkipAwait`
+
+
+**Stack:** `value` &rArr; `value_or_resolved, can_skip`
+
+Decide whether awaiting 'value' can be skipped.
+
+This is part of an optimization for `await` expressions. Programs very
+often await values that aren't promises, or promises that are already
+resolved. We can then sometimes skip suspending the current frame and
+returning to the microtask loop. If the circumstances permit the
+optimization, `TrySkipAwait` replaces `value` with the result of the
+`await` expression (unwrapping the resolved promise, if any) and pushes
+`true`. Otherwise, it leaves `value` unchanged and pushes 'false'.
+
+
+
+##### `ResumeKind`
+
+**Operands:** `(GeneratorResumeKind resumeKind (encoded as uint8_t))`
+
+**Stack:** &rArr; `resumeKind`
+
+Pushes one of the GeneratorResumeKind values as Int32Value.
+
+
+
+##### `CheckResumeKind`
+
+
+**Stack:** `rval, gen, resumeKind` &rArr; `rval`
+
+Handle Throw and Return resumption.
+
+`gen` must be the generator object for the current frame. `resumeKind`
+must be a `GeneratorResumeKind` stored as an `Int32` value. If it is
+`Next`, continue to the next instruction. If `resumeKind` is `Throw` or
+`Return`, these completions are handled by throwing an exception. See
+`GeneratorThrowOrReturn`.
+
+
+
+##### `Resume`
+
+
+**Stack:** `gen, val, resumeKind` &rArr; `rval`
+
+Resume execution of a generator, async function, or async generator.
+
+This behaves something like a call instruction. It pushes a stack frame
+(the one saved when `gen` was suspended, rather than a fresh one) and
+runs instructions in it. Once `gen` returns or yields, its return value
+is pushed to this frame's stack and execution continues in this script.
+
+This instruction is emitted only for the `resumeGenerator` self-hosting
+intrinsic. It is used in the implementation of
+`%GeneratorPrototype%.next`, `.throw`, and `.return`.
+
+`gen` must be a suspended generator object. `resumeKind` must be in
+range for `GeneratorResumeKind`.
+
+
+**Format:** JOF_INVOKE
+
+### Control flow ###
+
+#### Jump targets ####
+
+
+
+##### `JumpTarget`
+
+**Operands:** `(uint32_t icIndex)`
+
+
+No-op instruction marking the target of a jump instruction.
+
+This instruction and a few others (see `js::BytecodeIsJumpTarget`) are
+jump target instructions. The Baseline Interpreter uses these
+instructions to sync the frame's `interpreterICEntry` after a jump. Ion
+uses them to find block boundaries when translating bytecode to MIR.
+
+
+**Format:** JOF_ICINDEX
+
+##### `LoopHead`
+
+**Operands:** `(uint32_t icIndex, uint8_t depthHint)`
+
+
+Marks the target of the backwards jump for some loop.
+
+This is a jump target instruction (see `JSOp::JumpTarget`). Additionally,
+it checks for interrupts and handles JIT tiering.
+
+The `depthHint` operand is a loop depth hint for Ion. It starts at 1 and
+deeply nested loops all have the same value.
+
+For the convenience of the JITs, scripts must not start with this
+instruction. See bug 1602390.
+
+
 
 #### Jumps ####
 
 
 
-##### JSOP_AND [-1, +1] (JUMP, DETECTING, LEFTASSOC)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `69 (0x45)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `cond` |
-| **Stack Defs** | `cond` |
-
-<p>Converts the top of stack value into a boolean, if the result is <code>false</code>,
-jumps to a 32-bit offset from the current bytecode.
-</p>
-
-##### JSOP_BACKPATCH [-0, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `149 (0x95)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Placeholder opcode used during bytecode generation. This never
-appears in a finished script. FIXME: bug 473671.
-</p>
-
-##### JSOP_GOTO [-0, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `6 (0x06)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Jumps to a 32-bit offset from the current bytecode.
-</p>
-
-##### JSOP_IFEQ [-1, +0] (JUMP, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `7 (0x07)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `cond` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value, converts it into a boolean, if the result is
-<code>false</code>, jumps to a 32-bit offset from the current bytecode.
-</p>
-<p>The idea is that a sequence like
-<code>JSOP_ZERO</code>; <code>JSOP_ZERO</code>; <code>JSOP_EQ</code>; <code>JSOP_IFEQ</code>; <code>JSOP_RETURN</code>;
-reads like a nice linear sequence that will execute the return.
-</p>
-
-##### JSOP_IFNE [-1, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `8 (0x08)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `cond` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value, converts it into a boolean, if the result is
-<code>true</code>, jumps to a 32-bit offset from the current bytecode.
-</p>
-
-##### JSOP_LABEL [-0, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `106 (0x6a)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>This opcode precedes every labeled statement. It's a no-op.
-</p>
-<p><code>offset</code> is the offset to the next instruction after this statement,
-the one <code>break LABEL;</code> would jump to. IonMonkey uses this.
-</p>
-
-##### JSOP_LOOPENTRY [-0, +0] (UINT8)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `227 (0xe3)` |
-| **Operands**   | `uint8_t BITFIELD` |
-| **Length**     | 2 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>This opcode is the target of the entry jump for some loop. The uint8
-argument is a bitfield. The lower 7 bits of the argument indicate the
-loop depth. This value starts at 1 and is just a hint: deeply nested
-loops all have the same value.  The upper bit is set if Ion should be
-able to OSR at this point, which is true unless there is non-loop state
-on the stack.
-</p>
-
-##### JSOP_LOOPHEAD [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `109 (0x6d)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Another no-op.
-</p>
-<p>This opcode is the target of the backwards jump for some loop.
-</p>
-
-##### JSOP_OR [-1, +1] (JUMP, DETECTING, LEFTASSOC)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `68 (0x44)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `cond` |
-| **Stack Defs** | `cond` |
-
-<p>Converts the top of stack value into a boolean, if the result is <code>true</code>,
-jumps to a 32-bit offset from the current bytecode.
-</p>
-
-#### Switch Statement ####
-
-
-
-##### JSOP_CASE [-2, +1] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `121 (0x79)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `lval(if lval !== rval)` |
-
-<p>Pops the top two values on the stack as <code>rval</code> and <code>lval</code>, compare them
-with <code>===</code>, if the result is <code>true</code>, jumps to a 32-bit offset from the
-current bytecode, re-pushes <code>lval</code> onto the stack if <code>false</code>.
-</p>
-
-##### JSOP_CONDSWITCH [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `120 (0x78)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>This no-op appears after the bytecode for EXPR in <code>switch (EXPR) {...}</code>
-if the switch cannot be optimized using <code>JSOP_TABLESWITCH</code>.
-For a non-optimized switch statement like this:
-</p>
-<pre>   switch (EXPR) {
-     case V0:
-       C0;
-     ...
-     default:
-       D;
-   }
-</pre>
-<p>the bytecode looks like this:
-</p>
-<pre>   (EXPR)
-   condswitch
-   (V0)
-   case -&gt;C0
-   ...
-   default -&gt;D
-   (C0)
-   ...
-   (D)
-</pre>
-<p>Note that code for all case-labels is emitted first, then code for
-the body of each case clause.
-</p>
-
-##### JSOP_DEFAULT [-1, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `122 (0x7a)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | `lval` |
-| **Stack Defs** | ` ` |
-
-<p>This appears after all cases in a <code>JSOP_CONDSWITCH</code>, whether there is a
-<code>default:</code> label in the switch statement or not. Pop the switch operand
-from the stack and jump to a 32-bit offset from the current bytecode.
-offset from the current bytecode.
-</p>
-
-##### JSOP_TABLESWITCH [-1, +0] (TABLESWITCH, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `70 (0x46)` |
-| **Operands**   | `int32_t len, int32_t low, int32_t high,int32_t offset[0], ..., int32_t offset[high-low]` |
-| **Length**     | len |
-| **Stack Uses** | `i` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value as <code>i</code>, if <code>low &lt;= i &lt;= high</code>,
-jumps to a 32-bit offset: <code>offset[i - low]</code> from the current bytecode,
-jumps to a 32-bit offset: <code>len</code> from the current bytecode if not.
-</p>
-<p>This opcode has variable length.
-</p>
-
-#### For-In Statement ####
-
-
-
-##### JSOP_ENDITER [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `78 (0x4e)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `iter` |
-| **Stack Defs** | ` ` |
-
-<p>Exits a for-in loop by popping the iterator object from the stack and
-closing it.
-</p>
-
-##### JSOP_ISNOITER [-1, +2]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `77 (0x4d)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `val, res` |
-
-<p>Pushes a boolean indicating whether the value on top of the stack is
-MagicValue(<code>JS_NO_ITER_VALUE</code>).
-</p>
-
-
-##### JSOP_ITER [-1, +1] (UINT8)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `75 (0x4b)` |
-| **Operands**   | `uint8_t flags` |
-| **Length**     | 2 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `iter` |
-
-<p>Sets up a for-in or for-each-in loop using the <code>JSITER_*</code> flag bits in
-this op's uint8_t immediate operand. It pops the top of stack value as
-<code>val</code> and pushes <code>iter</code> which is an iterator for <code>val</code>.
-</p>
-
-##### JSOP_MOREITER [-1, +2]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `76 (0x4c)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `iter` |
-| **Stack Defs** | `iter, val` |
-
-<p>Pushes the next iterated value onto the stack. If no value is available,
-MagicValue(<code>JS_NO_ITER_VALUE</code>) is pushed.
-</p>
-
-
-#### With Statement ####
-
-
-
-##### JSOP_ENTERWITH [-1, +0] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `3 (0x03)` |
-| **Operands**   | `uint32_t staticWithIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value, converts it to an object, and adds a
-<code>DynamicWithObject</code> wrapping that object to the scope chain.
-</p>
-<p>There is a matching <code>JSOP_LEAVEWITH</code> instruction later. All name
-lookups between the two that may need to consult the With object
-are deoptimized.
-</p>
-
-##### JSOP_LEAVEWITH [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `4 (0x04)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the scope chain object pushed by <code>JSOP_ENTERWITH</code>.
-</p>
-
-#### Exception Handling ####
-
-
-
-##### JSOP_EXCEPTION [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `118 (0x76)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `exception` |
-
-<p>Pushes the current pending exception onto the stack and clears the
-pending exception. This is only emitted at the beginning of code for a
-catch-block, so it is known that an exception is pending. It is used to
-implement catch-blocks and <code>yield*</code>.
-</p>
-
-##### JSOP_FINALLY [-0, +2]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `135 (0x87)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `false, (next bytecode's PC)` |
-
-<p>This opcode has a def count of 2, but these values are already on the
-stack (they're pushed by <code>JSOP_GOSUB</code>).
-</p>
-
-##### JSOP_GOSUB [-0, +0] (JUMP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `116 (0x74)` |
-| **Operands**   | `int32_t offset` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Pushes <code>false</code> and next bytecode's PC onto the stack, and jumps to
-a 32-bit offset from the current bytecode.
-</p>
-<p>This opcode is used for entering <code>finally</code> block.
-</p>
-
-##### JSOP_RETSUB [-2, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `117 (0x75)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top two values on the stack as <code>rval</code> and <code>lval</code>, converts
-<code>lval</code> into a boolean, raises error if the result is <code>true</code>,
-jumps to a 32-bit absolute PC: <code>rval</code> if <code>false</code>.
-</p>
-<p>This opcode is used for returning from <code>finally</code> block.
-</p>
-
-##### JSOP_THROW [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `112 (0x70)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value as <code>v</code>, sets pending exception as <code>v</code>, then
-raises error.
-</p>
-
-##### JSOP_THROWING [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `151 (0x97)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value as <code>v</code>, sets pending exception as <code>v</code>,
-to trigger rethrow.
-</p>
-<p>This opcode is used in conditional catch clauses.
-</p>
-
-##### JSOP_TRY [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `134 (0x86)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>This no-op appears at the top of the bytecode for a <code>TryStatement</code>.
-</p>
-<p>Location information for catch/finally blocks is stored in a
-side table, <code>script-&gt;trynotes()</code>.
-</p>
-
-#### Function ####
-
-
-
-##### JSOP_CALL [-(argc+2), +1] (UINT16, INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `58 (0x3a)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>callee</code> with <code>this</code> and <code>args</code>, pushes return value onto the
-stack.
-</p>
-
-##### JSOP_EVAL [-(argc+2), +1] (UINT16, INVOKE, TYPESET, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `123 (0x7b)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>eval</code> with <code>args</code> and pushes return value onto the stack.
-</p>
-<p>If <code>eval</code> in global scope is not original one, invokes the function
-with <code>this</code> and <code>args</code>, and pushes return value onto the stack.
-</p>
-
-##### JSOP_FUNAPPLY [-(argc+2), +1] (UINT16, INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `79 (0x4f)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>callee</code> with <code>this</code> and <code>args</code>, pushes return value onto the
-stack.
-</p>
-<p>This is for <code>f.apply</code>.
-</p>
-
-##### JSOP_FUNCALL [-(argc+2), +1] (UINT16, INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `108 (0x6c)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>callee</code> with <code>this</code> and <code>args</code>, pushes return value onto the
-stack.
-</p>
-<p>If <code>callee</code> is determined to be the canonical <code>Function.prototype.call</code>
-function, then this operation is optimized to directly call <code>callee</code>
-with <code>args[0]</code> as <code>this</code>, and the remaining arguments as formal args
-to <code>callee</code>.
-</p>
-<p>Like <code>JSOP_FUNAPPLY</code> but for <code>f.call</code> instead of <code>f.apply</code>.
-</p>
-
-##### JSOP_LAMBDA [-0, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `130 (0x82)` |
-| **Operands**   | `uint32_t funcIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes a closure for a named or anonymous function expression onto the
-stack.
-</p>
-
-##### JSOP_LAMBDA_ARROW [-1, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `131 (0x83)` |
-| **Operands**   | `uint32_t funcIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `this` |
-| **Stack Defs** | `obj` |
-
-<p>Pops the top of stack value as <code>this</code>, pushes an arrow function with
-<code>this</code> onto the stack.
-</p>
-
-##### JSOP_NEW [-(argc+2), +1] (UINT16, INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `82 (0x52)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>callee</code> as a constructor with <code>this</code> and <code>args</code>, pushes return
-value onto the stack.
-</p>
-
-##### JSOP_RETRVAL [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `153 (0x99)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Stops interpretation and returns value set by <code>JSOP_SETRVAL</code>. When not set,
-returns <code>undefined</code>.
-</p>
-<p>Also emitted at end of script so interpreter don't need to check if
-opcode is still in script range.
-</p>
-
-##### JSOP_RETURN [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `5 (0x05)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `rval` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value as <code>rval</code>, stops interpretation of current
-script and returns <code>rval</code>.
-</p>
-
-##### JSOP_RUNONCE [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `71 (0x47)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Prologue emitted in scripts expected to run once, which deoptimizes code
-if it executes multiple times.
-</p>
-
-##### JSOP_SETCALL [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `74 (0x4a)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Sometimes web pages do <code>o.Item(i) = j</code>. This is not an early SyntaxError,
-for web compatibility. Instead we emit <code>JSOP_SETCALL</code> after the function
-call, an opcode that always throws.
-</p>
-
-##### JSOP_SETRVAL [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `152 (0x98)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `rval` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top of stack value as <code>rval</code>, sets the return value in stack
-frame as <code>rval</code>.
-</p>
-
-##### JSOP_SPREADCALL [-3, +1] (INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `41 (0x29)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `callee, this, args` |
-| **Stack Defs** | `rval` |
-
-<p>spreadcall variant of <code>JSOP_CALL</code>.
-</p>
-<p>Invokes <code>callee</code> with <code>this</code> and <code>args</code>, pushes the return value onto
-the stack.
-</p>
-<p><code>args</code> is an Array object which contains actual arguments.
-</p>
-
-##### JSOP_SPREADEVAL [-3, +1] (INVOKE, TYPESET, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `43 (0x2b)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `callee, this, args` |
-| **Stack Defs** | `rval` |
-
-<p>spreadcall variant of <code>JSOP_EVAL</code>
-</p>
-<p>Invokes <code>eval</code> with <code>args</code> and pushes the return value onto the stack.
-</p>
-<p>If <code>eval</code> in global scope is not original one, invokes the function
-with <code>this</code> and <code>args</code>, and pushes return value onto the stack.
-</p>
-
-##### JSOP_SPREADNEW [-3, +1] (INVOKE, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `42 (0x2a)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `callee, this, args` |
-| **Stack Defs** | `rval` |
-
-<p>spreadcall variant of <code>JSOP_NEW</code>
-</p>
-<p>Invokes <code>callee</code> as a constructor with <code>this</code> and <code>args</code>, pushes the
-return value onto the stack.
-</p>
-
-##### JSOP_STRICTEVAL [-(argc+2), +1] (UINT16, INVOKE, TYPESET, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `124 (0x7c)` |
-| **Operands**   | `uint16_t argc` |
-| **Length**     | 3 |
-| **Stack Uses** | `callee, this, args[0], ..., args[argc-1]` |
-| **Stack Defs** | `rval` |
-
-<p>Invokes <code>eval</code> with <code>args</code> and pushes return value onto the stack.
-</p>
-<p>If <code>eval</code> in global scope is not original one, invokes the function
-with <code>this</code> and <code>args</code>, and pushes return value onto the stack.
-</p>
-
-##### JSOP_STRICTSPREADEVAL [-3, +1] (INVOKE, TYPESET, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `50 (0x32)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `callee, this, args` |
-| **Stack Defs** | `rval` |
-
-<p>spreadcall variant of <code>JSOP_EVAL</code>
-</p>
-<p>Invokes <code>eval</code> with <code>args</code> and pushes the return value onto the stack.
-</p>
-<p>If <code>eval</code> in global scope is not original one, invokes the function
-with <code>this</code> and <code>args</code>, and pushes return value onto the stack.
-</p>
-
-#### Generator ####
-
-
-
-##### JSOP_FINALYIELDRVAL [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `204 (0xcc)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `gen` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the generator and suspends and closes it. Yields the value in the
-frame's return value slot.
-</p>
-
-##### JSOP_GENERATOR [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `201 (0xc9)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `generator` |
-
-<p>Initializes generator frame, creates a generator and pushes it on the
-stack.
-</p>
-
-##### JSOP_INITIALYIELD [-1, +1] (UINT24)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `202 (0xca)` |
-| **Operands**   | `uint24_t yieldIndex` |
-| **Length**     | 4 |
-| **Stack Uses** | `generator` |
-| **Stack Defs** | `wat` |
-
-<p>Pops the generator from the top of the stack, suspends it and stops
-interpretation.
-</p>
-
-##### JSOP_RESUME [-2, +1] (UINT8, INVOKE)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `205 (0xcd)` |
-| **Operands**   | `resume kind (GeneratorObject::ResumeKind)` |
-| **Length**     | 3 |
-| **Stack Uses** | `gen, val` |
-| **Stack Defs** | `rval` |
-
-<p>Pops the generator and argument from the stack, pushes a new generator
-frame and resumes execution of it. Pushes the return value after the
-generator yields.
-</p>
-
-##### JSOP_YIELD [-2, +1] (UINT24)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `203 (0xcb)` |
-| **Operands**   | `uint24_t yieldIndex` |
-| **Length**     | 4 |
-| **Stack Uses** | `rval1, gen` |
-| **Stack Defs** | `rval2` |
-
-<p>Pops the generator and the return value <code>rval1</code>, stops interpretation and
-returns <code>rval1</code>. Pushes sent value from <code>send()</code> onto the stack.
-</p>
-
-#### Debugger ####
-
-
-
-##### JSOP_DEBUGGER [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `115 (0x73)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Invokes debugger.
-</p>
-
-##### JSOP_DEBUGLEAVEBLOCK [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `200 (0xc8)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>The opcode to assist the debugger.
-</p>
-
-### Variables and Scopes ###
-
-#### Variables ####
-
-
-
-##### JSOP_BINDNAME [-0, +1] (ATOM, NAME, SET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `110 (0x6e)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `scope` |
-
-<p>Looks up name on the scope chain and pushes the scope which contains
-the name onto the stack. If not found, pushes global scope onto the
-stack.
-</p>
-
-##### JSOP_DEFCONST [-0, +0] (ATOM)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `128 (0x80)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Defines the new binding on the frame's current variables-object (the
-scope object on the scope chain designated to receive new variables) with
-<code>READONLY</code> attribute. The binding is *not* <code>JSPROP_PERMANENT</code>. See bug
-1019181 for the reason.
-</p>
-<p>This is used for global scripts and also in some cases for function
-scripts where use of dynamic scoping inhibits optimization.
-</p>
-
-##### JSOP_DEFFUN [-0, +0] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `127 (0x7f)` |
-| **Operands**   | `uint32_t funcIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Defines the given function on the current scope.
-</p>
-<p>This is used for global scripts and also in some cases for function
-scripts where use of dynamic scoping inhibits optimization.
-</p>
-
-##### JSOP_DEFVAR [-0, +0] (ATOM)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `129 (0x81)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Defines the new binding on the frame's current variables-object (the
-scope object on the scope chain designated to receive new variables).
-</p>
-<p>This is used for global scripts and also in some cases for function
-scripts where use of dynamic scoping inhibits optimization.
-</p>
-
-##### JSOP_DELNAME [-0, +1] (ATOM, NAME, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `36 (0x24)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `succeeded` |
-
-<p>Looks up name on the scope chain and deletes it, pushes <code>true</code> onto the
-stack if succeeded (if the property was present and deleted or if the
-property wasn't present in the first place), <code>false</code> if not.
-</p>
-<p>Strict mode code should never contain this opcode.
-</p>
-
-##### JSOP_GETNAME [-0, +1] (ATOM, NAME, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `59 (0x3b)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Looks up name on the scope chain and pushes its value onto the stack.
-</p>
-
-##### JSOP_SETCONST [-1, +1] (ATOM, NAME, SET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `14 (0x0e)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `val` |
-
-<p>Defines a readonly property on the frame's current variables-object (the
-scope object on the scope chain designated to receive new variables).
-</p>
-
-##### JSOP_SETNAME [-2, +1] (ATOM, NAME, SET, DETECTING, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `111 (0x6f)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `scope, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops a scope and value from the stack, assigns value to the given name,
-and pushes the value back on the stack
-</p>
-
-##### JSOP_STRICTSETNAME [-2, +1] (ATOM, NAME, SET, DETECTING, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `49 (0x31)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `scope, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops a scope and value from the stack, assigns value to the given name,
-and pushes the value back on the stack. If the set failed, then throw
-a TypeError, per usual strict mode semantics.
-</p>
-
-#### Free Variables ####
-
-
-
-##### JSOP_BINDGNAME [-0, +1] (ATOM, NAME, SET, GNAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `214 (0xd6)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `global` |
-
-<p>Pushes the global scope onto the stack.
-</p>
-<p><code>nameIndex</code> is not used.
-</p>
-
-##### JSOP_GETGNAME [-0, +1] (ATOM, NAME, TYPESET, GNAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `154 (0x9a)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Looks up name on global scope and pushes its value onto the stack.
-</p>
-<p>Free variable references that must either be found on the global or a
+##### `Goto`
+
+**Operands:** `(int32_t offset)`
+
+
+Jump to a 32-bit offset from the current bytecode.
+
+See "Jump instructions" above for details.
+
+
+**Format:** JOF_JUMP
+
+##### `IfEq`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `cond` &rArr;
+
+If ToBoolean(`cond`) is false, jumps to a 32-bit offset from the current
+instruction.
+
+
+**Format:** JOF_JUMP, JOF_IC
+
+##### `IfNe`
+
+**Operands:** `(int32_t offset)`
+
+**Stack:** `cond` &rArr;
+
+If ToBoolean(`cond`) is true, jump to a 32-bit offset from the current
+instruction.
+
+`offset` may be positive or negative. This is the instruction used at the
+end of a do-while loop to jump back to the top.
+
+
+**Format:** JOF_JUMP, JOF_IC
+
+##### `And`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `cond` &rArr; `cond`
+
+Short-circuit for logical AND.
+
+If ToBoolean(`cond`) is false, jump to a 32-bit offset from the current
+instruction. The value remains on the stack.
+
+
+**Format:** JOF_JUMP, JOF_IC
+
+##### `Or`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `cond` &rArr; `cond`
+
+Short-circuit for logical OR.
+
+If ToBoolean(`cond`) is true, jump to a 32-bit offset from the current
+instruction. The value remains on the stack.
+
+
+**Format:** JOF_JUMP, JOF_IC
+
+##### `Coalesce`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `val` &rArr; `val`
+
+Short-circuiting for nullish coalescing.
+
+If `val` is not null or undefined, jump to a 32-bit offset from the
+current instruction.
+
+
+**Format:** JOF_JUMP
+
+##### `Case`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `val, cond` &rArr; `val (if !cond)`
+
+Like `JSOp::IfNe` ("jump if true"), but if the branch is taken,
+pop and discard an additional stack value.
+
+This is used to implement `switch` statements when the
+`JSOp::TableSwitch` optimization is not possible. The switch statement
+
+    switch (expr) {
+        case A: stmt1;
+        case B: stmt2;
+    }
+
+compiles to this bytecode:
+
+        # dispatch code - evaluate expr, check it against each `case`,
+        # jump to the right place in the body or to the end.
+        <expr>
+        Dup; <A>; StrictEq; Case L1; JumpTarget
+        Dup; <B>; StrictEq; Case L2; JumpTarget
+        Default LE
+
+        # body code
+    L1: JumpTarget; <stmt1>
+    L2: JumpTarget; <stmt2>
+    LE: JumpTarget
+
+This opcode is weird: it's the only one whose ndefs varies depending on
+which way a conditional branch goes. We could implement switch
+statements using `JSOp::IfNe` and `JSOp::Pop`, but that would also be
+awkward--putting the `JSOp::Pop` inside the `switch` body would
+complicate fallthrough.
+
+
+**Format:** JOF_JUMP
+
+##### `Default`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `lval` &rArr;
+
+Like `JSOp::Goto`, but pop and discard an additional stack value.
+
+This appears after all cases for a non-optimized `switch` statement. If
+there's a `default:` label, it jumps to that point in the body;
+otherwise it jumps to the next statement.
+
+
+**Format:** JOF_JUMP
+
+##### `TableSwitch`
+
+**Operands:** `(int32_t defaultOffset, int32_t low, int32_t high, uint24_t firstResumeIndex)`
+
+**Stack:** `i` &rArr;
+
+Optimized switch-statement dispatch, used when all `case` labels are
+small integer constants.
+
+If `low <= i <= high`, jump to the instruction at the offset given by
+`script->resumeOffsets()[firstResumeIndex + i - low]`, in bytes from the
+start of the current script's bytecode. Otherwise, jump to the
+instruction at `defaultOffset` from the current instruction. All of
+these offsets must be in range for the current script and must point to
+`JSOp::JumpTarget` instructions.
+
+The following inequalities must hold: `low <= high` and
+`firstResumeIndex + high - low < resumeOffsets().size()`.
+
+
+
+#### Return ####
+
+
+
+##### `Return`
+
+
+**Stack:** `rval` &rArr;
+
+Return `rval`.
+
+This must not be used in derived class constructors. Instead use
+`JSOp::SetRval`, `JSOp::CheckReturn`, and `JSOp::RetRval`.
+
+
+
+##### `GetRval`
+
+
+**Stack:** &rArr; `rval`
+
+Push the current stack frame's `returnValue`. If no `JSOp::SetRval`
+instruction has been executed in this stack frame, this is `undefined`.
+
+Every stack frame has a `returnValue` slot, used by top-level scripts,
+generators, async functions, and derived class constructors. Plain
+functions usually use `JSOp::Return` instead.
+
+
+
+##### `SetRval`
+
+
+**Stack:** `rval` &rArr;
+
+Store `rval` in the current stack frame's `returnValue` slot.
+
+This instruction must not be used in a toplevel script compiled with the
+`noScriptRval` option.
+
+
+
+##### `RetRval`
+
+
+
+Stop execution and return the current stack frame's `returnValue`. If no
+`JSOp::SetRval` instruction has been executed in this stack frame, this
+is `undefined`.
+
+Also emitted at end of every script so consumers don't need to worry
+about running off the end.
+
+If the current script is a derived class constructor, `returnValue` must
+be an object. The script can use `JSOp::CheckReturn` to ensure this.
+
+
+
+##### `CheckReturn`
+
+
+**Stack:** `thisval` &rArr;
+
+Check the return value in a derived class constructor.
+
+-   If the current stack frame's `returnValue` is an object, do nothing.
+
+-   Otherwise, if the `returnValue` is undefined and `thisval` is an
+    object, store `thisval` in the `returnValue` slot.
+
+-   Otherwise, throw a TypeError.
+
+This is exactly what has to happen when a derived class constructor
+returns. `thisval` should be the current value of `this`, or
+`MagicValue(JS_UNINITIALIZED_LEXICAL)` if `this` is uninitialized.
+
+Implements: [The [[Construct]] internal method of JS functions][1],
+steps 13 and 15.
+
+[1]: https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
+
+
+
+#### Exceptions ####
+
+
+
+##### `Throw`
+
+
+**Stack:** `exc` &rArr;
+
+Throw `exc`. (ノಠ益ಠ)ノ彡┴──┴
+
+This sets the pending exception to `exc` and jumps to error-handling
+code. If we're in a `try` block, error handling adjusts the stack and
+environment chain and resumes execution at the top of the `catch` or
+`finally` block. Otherwise it starts unwinding the stack.
+
+Implements: [*ThrowStatement* Evaluation][1], step 3.
+
+This is also used in for-of loops. If the body of the loop throws an
+exception, we catch it, close the iterator, then use `JSOp::Throw` to
+rethrow.
+
+[1]: https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
+
+
+
+##### `ThrowMsg`
+
+**Operands:** `(ThrowMsgKind msgNumber)`
+
+
+Create and throw an Error object.
+
+Sometimes we know at emit time that an operation always throws. For
+example, `delete super.prop;` is allowed in methods, but always throws a
 ReferenceError.
-</p>
 
-##### JSOP_SETGNAME [-2, +1] (ATOM, NAME, SET, DETECTING, GNAME, CHECKSLOPPY)
+`msgNumber` must be one of the error codes listed in js/src/js.msg; it
+determines the `.message` and [[Prototype]] of the new Error object. The
+number of arguments in the error message must be 0.
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `155 (0x9b)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `scope, val` |
-| **Stack Defs** | `val` |
 
-<p>Pops the top two values on the stack as <code>val</code> and <code>scope</code>, sets property
-of <code>scope</code> as <code>val</code> and pushes <code>val</code> back on the stack.
-</p>
-<p><code>scope</code> should be the global scope.
-</p>
-
-##### JSOP_STRICTSETGNAME [-2, +1] (ATOM, NAME, SET, DETECTING, GNAME, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `156 (0x9c)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `scope, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top two values on the stack as <code>val</code> and <code>scope</code>, sets property
-of <code>scope</code> as <code>val</code> and pushes <code>val</code> back on the stack. Throws a
-TypeError if the set fails, per strict mode semantics.
-</p>
-<p><code>scope</code> should be the global scope.
-</p>
-
-#### Local Variables ####
-
-
-
-##### JSOP_CHECKLEXICAL [-0, +0] (LOCAL, NAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `138 (0x8a)` |
-| **Operands**   | `uint32_t localno` |
-| **Length**     | 4 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Checks if the value of the local variable is the
-<code>JS_UNINITIALIZED_LEXICAL</code> magic, throwing an error if so.
-</p>
-
-##### JSOP_GETLOCAL [-0, +1] (LOCAL, NAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `86 (0x56)` |
-| **Operands**   | `uint32_t localno` |
-| **Length**     | 4 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes the value of local variable onto the stack.
-</p>
-
-##### JSOP_INITLEXICAL [-1, +1] (LOCAL, NAME, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `139 (0x8b)` |
-| **Operands**   | `uint32_t localno` |
-| **Length**     | 4 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v` |
-
-<p>Initializes an uninitialized local lexical binding with the top of stack
-value.
-</p>
-
-##### JSOP_SETLOCAL [-1, +1] (LOCAL, NAME, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `87 (0x57)` |
-| **Operands**   | `uint32_t localno` |
-| **Length**     | 4 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v` |
-
-<p>Stores the top stack value to the given local.
-</p>
-
-#### Aliased Variables ####
-
-
-
-##### JSOP_CHECKALIASEDLEXICAL [-0, +0] (SCOPECOORD, NAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `140 (0x8c)` |
-| **Operands**   | `uint8_t hops, uint24_t slot` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Checks if the value of the aliased variable is the
-<code>JS_UNINITIALIZED_LEXICAL</code> magic, throwing an error if so.
-</p>
-
-##### JSOP_GETALIASEDVAR [-0, +1] (SCOPECOORD, NAME, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `136 (0x88)` |
-| **Operands**   | `uint8_t hops, uint24_t slot` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `aliasedVar` |
-
-<p>Pushes aliased variable onto the stack.
-</p>
-<p>An "aliased variable" is a var, let, or formal arg that is aliased.
-Sources of aliasing include: nested functions accessing the vars of an
-enclosing function, function statements that are conditionally executed,
-<code>eval</code>, <code>with</code>, and <code>arguments</code>. All of these cases require creating a
-CallObject to own the aliased variable.
-</p>
-<p>An ALIASEDVAR opcode contains the following immediates:
-</p>
-<pre>uint8 hops:  the number of scope objects to skip to find the ScopeObject
-             containing the variable being accessed
-uint24 slot: the slot containing the variable in the ScopeObject (this
-             'slot' does not include RESERVED_SLOTS).
-</pre>
-
-##### JSOP_INITALIASEDLEXICAL [-1, +1] (SCOPECOORD, NAME, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `141 (0x8d)` |
-| **Operands**   | `uint8_t hops, uint24_t slot` |
-| **Length**     | 5 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v` |
-
-<p>Initializes an uninitialized aliased lexical binding with the top of
-stack value.
-</p>
-
-##### JSOP_SETALIASEDVAR [-1, +1] (SCOPECOORD, NAME, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `137 (0x89)` |
-| **Operands**   | `uint8_t hops, uint24_t slot` |
-| **Length**     | 5 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v` |
-
-<p>Sets aliased variable as the top of stack value.
-</p>
-
-#### Intrinsics ####
-
-
-
-##### JSOP_BINDINTRINSIC [-0, +1] (ATOM, NAME, SET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `145 (0x91)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `intrinsicHolder` |
-
-<p>Pushes <code>intrinsicHolder</code> onto the stack.
-</p>
-
-##### JSOP_GETINTRINSIC [-0, +1] (ATOM, NAME, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `143 (0x8f)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `intrinsic[name]` |
-
-<pre>Pushes the value of the intrinsic onto the stack.
-</pre>
-<p>Intrinsic names are emitted instead of <code>JSOP_*NAME</code> ops when the
-<code>CompileOptions</code> flag <code>selfHostingMode</code> is set.
-</p>
-<p>They are used in self-hosted code to access other self-hosted values and
-intrinsic functions the runtime doesn't give client JS code access to.
-</p>
-
-##### JSOP_SETINTRINSIC [-2, +1] (ATOM, NAME, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `144 (0x90)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `scope, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top two values on the stack as <code>val</code> and <code>scope</code>, sets intrinsic
-as <code>val</code>, and pushes <code>val</code> onto the stack.
-</p>
-<p><code>scope</code> is not used.
-</p>
-
-#### Block-local Scope ####
-
-
-
-##### JSOP_POPBLOCKSCOPE [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `199 (0xc7)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Pops block from the scope chain.
-</p>
-
-##### JSOP_PUSHBLOCKSCOPE [-0, +0] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `198 (0xc6)` |
-| **Operands**   | `uint32_t staticBlockObjectIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Pushes block onto the scope chain.
-</p>
-
-#### This ####
-
-
-
-##### JSOP_IMPLICITTHIS [-0, +1] (ATOM)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `226 (0xe2)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `this` |
-
-<p>Pushes the implicit <code>this</code> value for calls to the associated name onto
-the stack.
-</p>
-
-##### JSOP_THIS [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `65 (0x41)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `this` |
-
-<p>Pushes <code>this</code> value for current stack frame onto the stack.
-</p>
-
-#### Arguments ####
-
-
-
-##### JSOP_ARGUMENTS [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `9 (0x09)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `arguments` |
-
-<p>Pushes the <code>arguments</code> object for the current function activation.
-</p>
-<p>If <code><code>JSS</code>cript</code> is not marked <code>needsArgsObj</code>, then a
-<code>JS_OPTIMIZED_ARGUMENTS</code> magic value is pushed. Otherwise, a proper
-arguments object is constructed and pushed.
-</p>
-<p>This opcode requires that the function does not have rest parameter.
-</p>
-
-##### JSOP_CALLEE [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `132 (0x84)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `callee` |
-
-<p>Pushes current callee onto the stack.
-</p>
-<p>Used for named function expression self-naming, if lightweight.
-</p>
-
-##### JSOP_GETARG [-0, +1] (QARG , NAME)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `84 (0x54)` |
-| **Operands**   | `uint16_t argno` |
-| **Length**     | 3 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `arguments[argno]` |
-
-<p>Fast get op for function arguments and local variables.
-</p>
-<p>Pushes <code>arguments[argno]</code> onto the stack.
-</p>
-
-##### JSOP_REST [-0, +1] (TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `224 (0xe0)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `rest` |
-
-<p>Creates rest parameter array for current function call, and pushes it
+
+##### `ThrowSetConst`
+
+**Operands:** `(uint32_t nameIndex)`
+
+
+Throws a runtime TypeError for invalid assignment to a `const` binding.
+
+
+**Format:** JOF_ATOM, JOF_NAME
+
+##### `Try`
+
+**Operands:** `(int32_t jumpAtEndOffset)`
+
+
+No-op instruction that marks the top of the bytecode for a
+*TryStatement*.
+
+The `jumpAtEndOffset` operand must be the offset (relative to the
+current op) of the `JSOp::Goto` at the end of the try-block body. This
+is used by bytecode analysis and JIT compilation.
+
+Location information for catch/finally blocks is stored in a side table,
+`script->trynotes()`.
+
+
+**Format:** JOF_CODE_OFFSET
+
+##### `TryDestructuring`
+
+
+
+No-op instruction used by the exception unwinder to determine the
+correct environment to unwind to when performing IteratorClose due to
+destructuring.
+
+This instruction must appear immediately before each
+`JSTRY_DESTRUCTURING` span in a script's try notes.
+
+
+
+##### `Exception`
+
+
+**Stack:** &rArr; `exception`
+
+Push and clear the pending exception. ┬──┬◡ﾉ(° -°ﾉ)
+
+This must be used only in the fixed sequence of instructions following a
+`JSTRY_CATCH` span (see "Bytecode Invariants" above), as that's the only
+way instructions would run with an exception pending.
+
+Used to implement catch-blocks, including the implicit ones generated as
+part of for-of iteration.
+
+
+
+##### `ResumeIndex`
+
+**Operands:** `(uint24_t resumeIndex)`
+
+**Stack:** &rArr; `resumeIndex`
+
+Push `resumeIndex`.
+
+This value must be used only by `JSOp::Gosub`, `JSOp::Finally`, and `JSOp::Retsub`.
+
+
+**Format:** JOF_RESUMEINDEX
+
+##### `Gosub`
+
+**Operands:** `(int32_t forwardOffset)`
+
+**Stack:** `false, resumeIndex` &rArr;
+
+Jump to the start of a `finally` block.
+
+`JSOp::Gosub` is unusual: if the finally block finishes normally, it will
+reach the `JSOp::Retsub` instruction at the end, and control then
+"returns" to the `JSOp::Gosub` and picks up at the next instruction, like
+a function call but within a single script and stack frame. (It's named
+after the thing in BASIC.)
+
+We need this because a `try` block can terminate in several different
+ways: control can flow off the end, return, throw an exception, `break`
+with or without a label, or `continue`. Exceptions are handled
+separately; but all those success paths are written as bytecode, and
+each one needs to run the `finally` block before continuing with
+whatever they were doing. They use `JSOp::Gosub` for this. It is thus
+normal for multiple `Gosub` instructions in a script to target the same
+`finally` block.
+
+Rules: `forwardOffset` must be positive and must target a
+`JSOp::JumpTarget` instruction followed by `JSOp::Finally`. The
+instruction immediately following `JSOp::Gosub` in the script must be a
+`JSOp::JumpTarget` instruction, and `resumeIndex` must be the index into
+`script->resumeOffsets()` that points to that instruction.
+
+Note: This op doesn't actually push or pop any values. Its use count of
+2 is a lie to make the stack depth math work for this very odd control
+flow instruction.
+
+`JSOp::Gosub` is considered to have two "successors": the target of
+`offset`, which is the actual next instruction to run; and the
+instruction immediately following `JSOp::Gosub`, even though it won't run
+until later. We define the successor graph this way in order to support
+knowing the stack depth at that instruction without first reading the
+whole `finally` block.
+
+The stack depth at that instruction is, as it happens, the current stack
+depth minus 2. So this instruction gets nuses == 2.
+
+Unfortunately there is a price to be paid in horribleness. When
+`JSOp::Gosub` runs, it leaves two values on the stack that the stack
+depth math doesn't know about. It jumps to the finally block, where
+`JSOp::Finally` again does nothing to the stack, but with a bogus def
+count of 2, restoring balance to the accounting. If `JSOp::Retsub` is
+reached, it pops the two values (for real this time) and control
+resumes at the instruction that follows JSOp::Gosub in memory.
+
+
+**Format:** JOF_JUMP
+
+##### `Finally`
+
+
+**Stack:** &rArr; `false, resumeIndex`
+
+No-op instruction that marks the start of a `finally` block. This has a
+def count of 2, but the values are already on the stack (they're
+actually left on the stack by `JSOp::Gosub`).
+
+These two values must not be used except by `JSOp::Retsub`.
+
+
+
+##### `Retsub`
+
+
+**Stack:** `throwing, v` &rArr;
+
+Jump back to the next instruction, or rethrow an exception, at the end
+of a `finally` block. See `JSOp::Gosub` for the explanation.
+
+If `throwing` is true, throw `v`. Otherwise, `v` must be a resume index;
+jump to the corresponding offset within the script.
+
+The two values popped must be the ones notionally pushed by
+`JSOp::Finally`.
+
+
+
+### Variables and scopes ###
+
+#### Initialization ####
+
+
+
+##### `Uninitialized`
+
+
+**Stack:** &rArr; `uninitialized`
+
+Push `MagicValue(JS_UNINITIALIZED_LEXICAL)`, a magic value used to mark
+a binding as uninitialized.
+
+This magic value must be used only by `JSOp::InitLexical`.
+
+
+
+##### `InitLexical`
+
+**Operands:** `(uint24_t localno)`
+
+**Stack:** `v` &rArr; `v`
+
+Initialize an optimized local lexical binding; or mark it as
+uninitialized.
+
+This stores the value `v` in the fixed slot `localno` in the current
+stack frame. If `v` is the magic value produced by `JSOp::Uninitialized`,
+this marks the binding as uninitialized. Otherwise this initializes the
+binding with value `v`.
+
+Implements: [CreateMutableBinding][1] step 3, substep "record that it is
+uninitialized", and [InitializeBinding][2], for optimized locals. (Note:
+this is how `const` bindings are initialized.)
+
+[1]: https://tc39.es/ecma262/#sec-declarative-environment-records-createmutablebinding-n-d
+[2]: https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
+
+
+**Format:** JOF_LOCAL, JOF_NAME
+
+##### `InitGLexical`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `val` &rArr; `val`
+
+Initialize a global lexical binding.
+
+The binding must already have been created by `DefLet` or `DefConst` and
+must be uninitialized.
+
+Like `JSOp::InitLexical` but for global lexicals. Unlike `InitLexical`
+this can't be used to mark a binding as uninitialized.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_PROPINIT, JOF_GNAME, JOF_IC
+
+##### `InitAliasedLexical`
+
+**Operands:** `(uint8_t hops, uint24_t slot)`
+
+**Stack:** `v` &rArr; `v`
+
+Initialize an aliased lexical binding; or mark it as uninitialized.
+
+Like `JSOp::InitLexical` but for aliased bindings.
+
+Note: There is no even-less-optimized `InitName` instruction because JS
+doesn't need it. We always know statically which binding we're
+initializing.
+
+`hops` is usually 0, but in `function f(a=eval("var b;")) { }`, the
+argument `a` is initialized from inside a nested scope, so `hops == 1`.
+
+
+**Format:** JOF_ENVCOORD, JOF_NAME, JOF_PROPINIT
+
+##### `CheckLexical`
+
+**Operands:** `(uint24_t localno)`
+
+**Stack:** `v` &rArr; `v`
+
+Throw a ReferenceError if the value on top of the stack is uninitialized.
+
+Typically used after `JSOp::GetLocal` with the same `localno`.
+
+Implements: [GetBindingValue][1] step 3 and [SetMutableBinding][2] step
+4 for declarative Environment Records.
+
+[1]: https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
+[2]: https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
+
+
+**Format:** JOF_LOCAL, JOF_NAME
+
+##### `CheckAliasedLexical`
+
+**Operands:** `(uint8_t hops, uint24_t slot)`
+
+**Stack:** `v` &rArr; `v`
+
+Like `JSOp::CheckLexical` but for aliased bindings.
+
+Typically used after `JSOp::GetAliasedVar` with the same hops/slot.
+
+Note: There are no `CheckName` or `CheckGName` instructions because
+they're unnecessary. `JSOp::{Get,Set}{Name,GName}` all check for
+uninitialized lexicals and throw if needed.
+
+
+**Format:** JOF_ENVCOORD, JOF_NAME
+
+##### `CheckThis`
+
+
+**Stack:** `this` &rArr; `this`
+
+Throw a ReferenceError if the value on top of the stack is
+`MagicValue(JS_UNINITIALIZED_LEXICAL)`. Used in derived class
+constructors to check `this` (which needs to be initialized before use,
+by calling `super()`).
+
+Implements: [GetThisBinding][1] step 3.
+
+[1]: https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
+
+
+
+#### Looking up bindings ####
+
+
+
+##### `BindGName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `global`
+
+Push the global environment onto the stack, unless the script has a
+non-syntactic global scope. In that case, this acts like JSOp::BindName.
+
+`nameIndex` is only used when acting like JSOp::BindName.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_GNAME, JOF_IC
+
+##### `BindName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `env`
+
+Look up a name on the environment chain and push the environment which
+contains a binding for that name. If no such binding exists, push the
+global lexical environment.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_IC
+
+#### Getting binding values ####
+
+
+
+##### `GetName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `val`
+
+Find a binding on the environment chain and push its value.
+
+If the binding is an uninitialized lexical, throw a ReferenceError. If
+no such binding exists, throw a ReferenceError unless the next
+instruction is `JSOp::Typeof`, in which case push `undefined`.
+
+Implements: [ResolveBinding][1] followed by [GetValue][2]
+(adjusted hackily for `typeof`).
+
+This is the fallback `Get` instruction that handles all unoptimized
+cases. Optimized instructions follow.
+
+[1]: https://tc39.es/ecma262/#sec-resolvebinding
+[2]: https://tc39.es/ecma262/#sec-getvalue
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+
+##### `GetGName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `val`
+
+Find a global binding and push its value.
+
+This searches the global lexical environment and, failing that, the
+global object. (Unlike most declarative environments, the global lexical
+environment can gain more bindings after compilation, possibly shadowing
+global object properties.)
+
+This is an optimized version of `JSOp::GetName` that skips all local
+scopes, for use when the name doesn't refer to any local binding.
+`NonSyntacticVariablesObject`s break this optimization, so if the
+current script has a non-syntactic global scope, this acts like
+`JSOp::GetName`.
+
+Like `JSOp::GetName`, this throws a ReferenceError if no such binding is
+found (unless the next instruction is `JSOp::Typeof`) or if the binding
+is an uninitialized lexical.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_GNAME, JOF_IC
+
+##### `GetArg`
+
+**Operands:** `(uint16_t argno)`
+
+**Stack:** &rArr; `arguments[argno]`
+
+Push the value of an argument that is stored in the stack frame
+or in an `ArgumentsObject`.
+
+
+**Format:** JOF_QARG, JOF_NAME
+
+##### `GetLocal`
+
+**Operands:** `(uint24_t localno)`
+
+**Stack:** &rArr; `val`
+
+Push the value of an optimized local variable.
+
+If the variable is an uninitialized lexical, push
+`MagicValue(JS_UNINIITALIZED_LEXICAL)`.
+
+
+**Format:** JOF_LOCAL, JOF_NAME
+
+##### `GetAliasedVar`
+
+**Operands:** `(uint8_t hops, uint24_t slot)`
+
+**Stack:** &rArr; `aliasedVar`
+
+Push the value of an aliased binding.
+
+Local bindings that aren't closed over or dynamically accessed are
+stored in stack slots. Global and `with` bindings are object properties.
+All other bindings are called "aliased" and stored in
+`EnvironmentObject`s.
+
+Where possible, `Aliased` instructions are used to access aliased
+bindings.  (There's no difference in meaning between `AliasedVar` and
+`AliasedLexical`.) Each of these instructions has operands `hops` and
+`slot` that encode an [`EnvironmentCoordinate`][1], directions to the
+binding from the current environment object.
+
+`Aliased` instructions can't be used when there's a dynamic scope (due
+to non-strict `eval` or `with`) that might shadow the aliased binding.
+
+[1]: https://searchfox.org/mozilla-central/search?q=symbol:T_js%3A%3AEnvironmentCoordinate
+
+
+**Format:** JOF_ENVCOORD, JOF_NAME, JOF_TYPESET, JOF_IC
+
+##### `GetImport`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `val`
+
+Get the value of a module import by name and pushes it onto the stack.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+
+##### `GetBoundName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `env` &rArr; `v`
+
+Get the value of a binding from the environment `env`. If the name is
+not bound in `env`, throw a ReferenceError.
+
+`env` must be an environment currently on the environment chain, pushed
+by `JSOp::BindName` or `JSOp::BindVar`.
+
+Note: `JSOp::BindName` and `JSOp::GetBoundName` are the two halves of the
+`JSOp::GetName` operation: finding and reading a variable. This
+decomposed version is needed to implement the compound assignment and
+increment/decrement operators, which get and then set a variable. The
+spec says the variable lookup is done only once. If we did the lookup
+twice, there would be observable bugs, thanks to dynamic scoping. We
+could set the wrong variable or call proxy traps incorrectly.
+
+Implements: [GetValue][1] steps 4 and 6.
+
+[1]: https://tc39.es/ecma262/#sec-getvalue
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+
+##### `GetIntrinsic`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `intrinsic[name]`
+
+Push the value of an intrinsic onto the stack.
+
+Non-standard. Intrinsics are slots in the intrinsics holder object (see
+`GlobalObject::getIntrinsicsHolder`), which is used in lieu of global
+bindings in self-hosting code.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+
+##### `Callee`
+
+
+**Stack:** &rArr; `callee`
+
+Pushes the currently executing function onto the stack.
+
+The current script must be a function script.
+
+Used to implement `super`. This is also used sometimes as a minor
+optimization when a named function expression refers to itself by name:
+
+    f = function fac(n) {  ... fac(n - 1) ... };
+
+This lets us optimize away a lexical environment that contains only the
+binding for `fac`, unless it's otherwise observable (via `with`, `eval`,
+or a nested closure).
+
+
+
+##### `EnvCallee`
+
+**Operands:** `(uint8_t numHops)`
+
+**Stack:** &rArr; `callee`
+
+Load the callee stored in a CallObject on the environment chain. The
+`numHops` operand is the number of environment objects to skip on the
+environment chain. The environment chain element indicated by `numHops`
+must be a CallObject.
+
+
+
+#### Setting binding values ####
+
+
+
+##### `SetName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `env, val` &rArr; `val`
+
+Assign `val` to the binding in `env` with the name given by `nameIndex`.
+Throw a ReferenceError if the binding is an uninitialized lexical.
+This can call setters and/or proxy traps.
+
+`env` must be an environment currently on the environment chain,
+pushed by `JSOp::BindName` or `JSOp::BindVar`.
+
+This is the fallback `Set` instruction that handles all unoptimized
+cases. Optimized instructions follow.
+
+Implements: [PutValue][1] steps 5 and 7 for unoptimized bindings.
+
+Note: `JSOp::BindName` and `JSOp::SetName` are the two halves of simple
+assignment: finding and setting a variable. They are two separate
+instructions because, per spec, the "finding" part happens before
+evaluating the right-hand side of the assignment, and the "setting" part
+after. Optimized cases don't need a `Bind` instruction because the
+"finding" is done statically.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+
+##### `StrictSetName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `env, val` &rArr; `val`
+
+Like `JSOp::SetName`, but throw a TypeError if there is no binding for
+the specified name in `env`, or if the binding is immutable (a `const`
+or read-only property).
+
+Implements: [PutValue][1] steps 5 and 7 for strict mode code.
+
+[1]: https://tc39.es/ecma262/#sec-putvalue
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+
+##### `SetGName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `env, val` &rArr; `val`
+
+Like `JSOp::SetName`, but for assigning to globals. `env` must be an
+environment pushed by `JSOp::BindGName`.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_GNAME, JOF_CHECKSLOPPY, JOF_IC
+
+##### `StrictSetGName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `env, val` &rArr; `val`
+
+Like `JSOp::StrictSetGName`, but for assigning to globals. `env` must be
+an environment pushed by `JSOp::BindGName`.
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_GNAME, JOF_CHECKSTRICT, JOF_IC
+
+##### `SetArg`
+
+**Operands:** `(uint16_t argno)`
+
+**Stack:** `val` &rArr; `val`
+
+Assign `val` to an argument binding that's stored in the stack frame or
+in an `ArgumentsObject`.
+
+
+**Format:** JOF_QARG, JOF_NAME
+
+##### `SetLocal`
+
+**Operands:** `(uint24_t localno)`
+
+**Stack:** `v` &rArr; `v`
+
+Assign to an optimized local binding.
+
+
+**Format:** JOF_LOCAL, JOF_NAME
+
+##### `SetAliasedVar`
+
+**Operands:** `(uint8_t hops, uint24_t slot)`
+
+**Stack:** `val` &rArr; `val`
+
+Assign to an aliased binding.
+
+Implements: [SetMutableBinding for declarative Environment Records][1],
+in certain cases where it's known that the binding exists, is mutable,
+and has been initialized.
+
+[1]: https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
+
+
+**Format:** JOF_ENVCOORD, JOF_NAME, JOF_PROPSET
+
+##### `SetIntrinsic`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** `val` &rArr; `val`
+
+Assign to an intrinsic.
+
+Nonstandard. Intrinsics are used in lieu of global bindings in self-
+hosted code. The value is actually stored in the intrinsics holder
+object, `GlobalObject::getIntrinsicsHolder`. (Self-hosted code doesn't
+have many global `var`s, but it has many `function`s.)
+
+
+**Format:** JOF_ATOM, JOF_NAME
+
+#### Entering and leaving environments ####
+
+
+
+##### `PushLexicalEnv`
+
+**Operands:** `(uint32_t lexicalScopeIndex)`
+
+
+Push a lexical environment onto the environment chain.
+
+The `LexicalScope` indicated by `lexicalScopeIndex` determines the shape
+of the new `LexicalEnvironmentObject`. All bindings in the new
+environment are marked as uninitialized.
+
+Implements: [Evaluation of *Block*][1], steps 1-4.
+
+#### Fine print for environment chain instructions
+
+The following rules for `JSOp::{Push,Pop}LexicalEnv` also apply to
+`JSOp::PushVarEnv` and `JSOp::{Enter,Leave}With`.
+
+Each `JSOp::PopLexicalEnv` instruction matches a particular
+`JSOp::PushLexicalEnv` instruction in the same script and must have the
+same scope and stack depth as the instruction immediately after that
+`PushLexicalEnv`.
+
+`JSOp::PushLexicalEnv` enters a scope that extends to some set of
+instructions in the script. Code must not jump into or out of this
+region: control can enter only by executing `PushLexicalEnv` and can
+exit only by executing a `PopLexicalEnv` or by exception unwinding. (A
+`JSOp::PopLexicalEnv` is always emitted at the end of the block, and
+extra copies are emitted on "exit slides", where a `break`, `continue`,
+or `return` statement exits the scope.)
+
+The script's `JSScript::scopeNotes()` must identify exactly which
+instructions begin executing in this scope. Typically this means a
+single entry marking the contiguous chunk of bytecode from the
+instruction after `JSOp::PushLexicalEnv` to `JSOp::PopLexicalEnv`
+(inclusive); but if that range contains any instructions on exit slides,
+after a `JSOp::PopLexicalEnv`, then those must be correctly noted as
+*outside* the scope.
+
+[1]: https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
+
+
+**Format:** JOF_SCOPE
+
+##### `PopLexicalEnv`
+
+
+
+Pop a lexical environment from the environment chain.
+
+See `JSOp::PushLexicalEnv` for the fine print.
+
+
+
+##### `DebugLeaveLexicalEnv`
+
+
+
+No-op instruction that indicates leaving an optimized lexical scope.
+
+If all bindings in a lexical scope are optimized into stack slots, then
+the runtime environment objects for that scope are optimized away. No
+`JSOp::{Push,Pop}LexicalEnv` instructions are emitted. However, the
+debugger still needs to be notified when control exits a scope; that's
+what this instruction does.
+
+The last instruction in a lexical scope, as indicated by scope notes,
+must be either this instruction (if the scope is optimized) or
+`JSOp::PopLexicalEnv` (if not).
+
+
+
+##### `RecreateLexicalEnv`
+
+
+
+Recreate the current block on the environment chain with a fresh block
+with uninitialized bindings. This implements the behavior of inducing a
+fresh lexical environment for every iteration of a for-in/of loop whose
+loop-head has a (captured) lexical declaration.
+
+The current environment must be a LexicalEnvironmentObject.
+
+
+
+##### `FreshenLexicalEnv`
+
+
+
+Replace the current block on the environment chain with a fresh block
+that copies all the bindings in the block. This implements the behavior
+of inducing a fresh lexical environment for every iteration of a
+`for(let ...; ...; ...)` loop, if any declarations induced by such a
+loop are captured within the loop.
+
+The current environment must be a LexicalEnvironmentObject.
+
+
+
+##### `PushVarEnv`
+
+**Operands:** `(uint32_t scopeIndex)`
+
+
+Push a var environment onto the environment chain.
+
+Like `JSOp::PushLexicalEnv`, but pushes a `VarEnvironmentObject` rather
+than a `LexicalEnvironmentObject`. The difference is that non-strict
+direct `eval` can add bindings to a var environment; see `VarScope` in
+Scope.h.
+
+See `JSOp::PushLexicalEnv` for the fine print.
+
+There is no corresponding `JSOp::PopVarEnv` operation, because a
+`VarEnvironmentObject` is never popped from the environment chain.
+
+Implements: Places in the spec where the VariableEnvironment is set:
+
+-   The bit in [PerformEval][1] where, in strict direct eval, the new
+    eval scope is taken as *varEnv* and becomes "*runningContext*'s
+    VariableEnvironment".
+
+-   The weird scoping rules for functions with default parameter
+    expressions, as specified in [FunctionDeclarationInstantiation][2]
+    step 28 ("NOTE: A separate Environment Record is needed...").
+
+Note: The spec also pushes a new VariableEnvironment on entry to every
+function, but the VM takes care of that as part of pushing the stack
+frame, before the function script starts to run, so `JSOp::PushVarEnv` is
+not needed.
+
+[1]: https://tc39.es/ecma262/#sec-performeval
+[2]: https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
+
+
+**Format:** JOF_SCOPE
+
+##### `EnterWith`
+
+**Operands:** `(uint32_t staticWithIndex)`
+
+**Stack:** `val` &rArr;
+
+Push a `WithEnvironmentObject` wrapping ToObject(`val`) to the
+environment chain.
+
+Implements: [Evaluation of `with` statements][1], steps 2-6.
+
+Operations that may need to consult a WithEnvironment can't be correctly
+implemented using optimized instructions like `JSOp::GetLocal`. A script
+must use the deoptimized `JSOp::GetName`, `BindName`, `SetName`, and
+`DelName` instead. Since those instructions don't work correctly with
+optimized locals and arguments, all bindings in scopes enclosing a
+`with` statement are marked as "aliased" and deoptimized too.
+
+See `JSOp::PushLexicalEnv` for the fine print.
+
+[1]: https://tc39.es/ecma262/#sec-with-statement-runtime-semantics-evaluation
+
+
+**Format:** JOF_SCOPE
+
+##### `LeaveWith`
+
+
+
+Pop a `WithEnvironmentObject` from the environment chain.
+
+See `JSOp::PushLexicalEnv` for the fine print.
+
+Implements: [Evaluation of `with` statements][1], step 8.
+
+[1]: https://tc39.es/ecma262/#sec-with-statement-runtime-semantics-evaluation
+
+
+
+#### Creating and deleting bindings ####
+
+
+
+##### `BindVar`
+
+
+**Stack:** &rArr; `env`
+
+Push the current VariableEnvironment (the environment on the environment
+chain designated to receive new variables).
+
+Implements: [Annex B.3.3.1, changes to FunctionDeclarationInstantiation
+for block-level functions][1], step 1.a.ii.3.a, and similar steps in
+other Annex B.3.3 algorithms, when setting the function's second binding
+can't be optimized.
+
+[1]: https://tc39.es/ecma262/#sec-web-compat-functiondeclarationinstantiation
+
+
+
+##### `DefVar`
+
+**Operands:** `(uint32_t nameIndex)`
+
+
+Create a new binding on the current VariableEnvironment (the environment
+on the environment chain designated to receive new variables).
+
+`JSOp::Def{Var,Let,Const,Fun}` instructions must appear in the script
+before anything else that might add bindings to the environment, and
+only once per binding. There must be a correct entry for the new binding
+in `script->bodyScope()`. (All this ensures that at run time, there is
+no existing conflicting binding. This is checked by the
+`JSOp::CheckGlobalOrEvalDecl` bytecode instruction that must appear
+before `JSOp::Def{Var,Let,Const,Fun}`.)
+
+Throw a SyntaxError if the current VariableEnvironment is the global
+environment and a binding with the same name exists on the global
+lexical environment.
+
+This is used for global scripts and also in some cases for function
+scripts where use of dynamic scoping inhibits optimization.
+
+
+**Format:** JOF_ATOM
+
+##### `DefFun`
+
+
+**Stack:** `fun` &rArr;
+
+Create a new binding for the given function on the current scope.
+
+`fun` must be a function object with an explicit name. The new
+variable's name is `fun->explicitName()`, and its value is `fun`. In
+global scope, this creates a new property on the global object.
+
+Implements: The body of the loop in [GlobalDeclarationInstantiation][1]
+step 17 ("For each Parse Node *f* in *functionsToInitialize*...") and
+the corresponding loop in [EvalDeclarationInstantiation][2].
+
+[1]: https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
+[2]: https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
+
+
+
+##### `DefLet`
+
+**Operands:** `(uint32_t nameIndex)`
+
+
+Create a new uninitialized mutable binding in the global lexical
+environment. Throw a SyntaxError if a binding with the same name already
+exists on that environment, or if a var binding with the same name
+exists on the global.
+
+
+**Format:** JOF_ATOM
+
+##### `DefConst`
+
+**Operands:** `(uint32_t nameIndex)`
+
+
+Like `DefLet`, but create an uninitialized constant binding.
+
+
+**Format:** JOF_ATOM
+
+##### `CheckGlobalOrEvalDecl`
+
+
+
+Check for conflicting bindings before `JSOp::Def{Var,Let,Const,Fun}` in
+global or sloppy eval scripts.
+
+Implements: [GlobalDeclarationInstantiation][1] steps 5, 6, 10 and 12,
+and [EvalDeclarationInstantiation][2] steps 5 and 8.
+
+[1]: https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
+[2]: https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
+
+
+
+##### `DelName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `succeeded`
+
+Look up a variable on the environment chain and delete it. Push `true`
+on success (if a binding was deleted, or if no such binding existed in
+the first place), `false` otherwise (most kinds of bindings can't be
+deleted).
+
+Implements: [`delete` *Identifier*][1], which [is a SyntaxError][2] in
+strict mode code.
+
+   [1]: https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
+   [2]: https://tc39.es/ecma262/#sec-delete-operator-static-semantics-early-errors
+
+
+**Format:** JOF_ATOM, JOF_NAME, JOF_CHECKSLOPPY
+
+#### Function environment setup ####
+
+
+
+##### `Arguments`
+
+
+**Stack:** &rArr; `arguments`
+
+Create and push the `arguments` object for the current function activation.
+
+When it exists, `arguments` is stored in an ordinary local variable.
+`JSOp::Arguments` is used in function preludes, to populate that variable
+before the function body runs, *not* each time `arguments` appears in a
+function.
+
+If a function clearly doesn't use `arguments`, we optimize it away when
+emitting bytecode. The function's script won't use `JSOp::Arguments` at
+all.
+
+The current script must be a function script. This instruction must
+execute at most once per function activation.
+
+#### Optimized arguments
+
+If `script->needsArgsObj()` is false, no ArgumentsObject is created.
+Instead, `MagicValue(JS_OPTIMIZED_ARGUMENTS)` is pushed.
+
+This optimization imposes no restrictions on bytecode. Rather,
+`js::jit::AnalyzeArgumentsUsage` examines the bytecode and enables the
+optimization only if all uses of `arguments` are optimizable.  Each
+execution engine must know what the analysis considers optimizable and
+cope with the magic value when it is used in those ways.
+
+Example 1: `arguments[0]` is supported; therefore the interpreter's
+implementation of `JSOp::GetElem` checks for optimized arguments (see
+`GetElemOptimizedArguments`).
+
+Example 2: `f.apply(this, arguments)` is supported; therefore our
+implementation of `Function.prototype.apply` checks for optimized
+arguments (`see js::fun_apply`), and all `JSOp::FunApply` implementations
+must check for cases where `f.apply` turns out to be any other function
+(see `GuardFunApplyArgumentsOptimization`).
+
+It's not documented anywhere exactly which opcodes support
+`JS_OPTIMIZED_ARGUMENTS`; see the source of `AnalyzeArgumentsUsage`.
+
+
+
+##### `Rest`
+
+
+**Stack:** &rArr; `rest`
+
+Create and push the rest parameter array for current function call.
+
+This must appear only in a script for a function that has a rest
+parameter.
+
+
+**Format:** JOF_TYPESET, JOF_IC
+
+##### `FunctionThis`
+
+
+**Stack:** &rArr; `this`
+
+Determines the `this` value for current function frame and pushes it
 onto the stack.
-</p>
-
-##### JSOP_SETARG [-1, +1] (QARG , NAME, SET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `85 (0x55)` |
-| **Operands**   | `uint16_t argno` |
-| **Length**     | 3 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v` |
-
-<p>Fast set op for function arguments and local variables.
-</p>
-<p>Sets <code>arguments[argno]</code> as the top of stack value.
-</p>
-
-### Operators ###
-
-#### Comparison Operators ####
-
-
 
-##### JSOP_EQ [-2, +1] (LEFTASSOC, ARITH, DETECTING)
-##### JSOP_GE [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_GT [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_LE [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_LT [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_NE [-2, +1] (LEFTASSOC, ARITH, DETECTING)
+In functions, `this` is stored in a local variable. This instruction is
+used in the function prologue to get the value to initialize that
+variable.  (This doesn't apply to arrow functions, becauses they don't
+have a `this` binding; also, `this` is optimized away if it's unused.)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_EQ: 18 (0x12)`<br>`JSOP_GE: 23 (0x17)`<br>`JSOP_GT: 22 (0x16)`<br>`JSOP_LE: 21 (0x15)`<br>`JSOP_LT: 20 (0x14)`<br>`JSOP_NE: 19 (0x13)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval OP rval)` |
-
-<p>Pops the top two values from the stack and pushes the result of
-comparing them.
-</p>
-
-##### JSOP_STRICTEQ [-2, +1] (DETECTING, LEFTASSOC, ARITH)
-##### JSOP_STRICTNE [-2, +1] (DETECTING, LEFTASSOC, ARITH)
+Functions that have a `this` binding have a local variable named
+`".this"`, which is initialized using this instruction in the function
+prologue.
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_STRICTEQ: 72 (0x48)`<br>`JSOP_STRICTNE: 73 (0x49)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval OP rval)` |
-
-<p>Pops the top two values from the stack, then pushes the result of
-applying the operator to the two values.
-</p>
+In non-strict functions, `this` is always an object. Undefined/null
+`this` is converted into the global `this` value. Other primitive values
+are boxed. See `js::BoxNonStrictThis`.
 
-#### Arithmetic Operators ####
 
 
+### Stack operations ###
 
-##### JSOP_ADD [-2, +1] (LEFTASSOC, ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `27 (0x1b)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval + rval)` |
 
-<p>Pops the top two values <code>lval</code> and <code>rval</code> from the stack, then pushes
-the result of <code>lval + rval</code>.
-</p>
+##### `Pop`
 
-##### JSOP_DIV [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_MOD [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_MUL [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_SUB [-2, +1] (LEFTASSOC, ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_DIV: 30 (0x1e)`<br>`JSOP_MOD: 31 (0x1f)`<br>`JSOP_MUL: 29 (0x1d)`<br>`JSOP_SUB: 28 (0x1c)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval OP rval)` |
+**Stack:** `v` &rArr;
 
-<p>Pops the top two values <code>lval</code> and <code>rval</code> from the stack, then pushes
-the result of applying the arithmetic operation to them.
-</p>
+Pop the top value from the stack and discard it.
 
-##### JSOP_NEG [-1, +1] (ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `34 (0x22)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(-val)` |
 
-<p>Pops the value <code>val</code> from the stack, then pushes <code>-val</code>.
-</p>
+##### `PopN`
 
-##### JSOP_POS [-1, +1] (ARITH)
+**Operands:** `(uint16_t n)`
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `35 (0x23)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(+val)` |
+**Stack:** `v[n-1], ..., v[1], v[0]` &rArr;
 
-<p>Pops the value <code>val</code> from the stack, then pushes <code>+val</code>.
-(<code>+val</code> is the value converted to a number.)
-</p>
+Pop the top `n` values from the stack. `n` must be <= the current stack
+depth.
 
-#### Bitwise Logical Operators ####
 
 
+##### `Dup`
 
-##### JSOP_BITAND [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_BITOR [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_BITXOR [-2, +1] (LEFTASSOC, ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_BITAND: 17 (0x11)`<br>`JSOP_BITOR: 15 (0x0f)`<br>`JSOP_BITXOR: 16 (0x10)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval OP rval)` |
+**Stack:** `v` &rArr; `v, v`
 
-<p>Pops the top two values <code>lval</code> and <code>rval</code> from the stack, then pushes
-the result of the operation applied to the two operands, converting
-both to 32-bit signed integers if necessary.
-</p>
+Push a copy of the top value on the stack.
 
-##### JSOP_BITNOT [-1, +1] (ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `33 (0x21)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(~val)` |
 
-<p>Pops the value <code>val</code> from the stack, then pushes <code>~val</code>.
-</p>
+##### `Dup2`
 
-#### Bitwise Shift Operators ####
 
+**Stack:** `v1, v2` &rArr; `v1, v2, v1, v2`
 
+Duplicate the top two values on the stack.
 
-##### JSOP_LSH [-2, +1] (LEFTASSOC, ARITH)
-##### JSOP_RSH [-2, +1] (LEFTASSOC, ARITH)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_LSH: 24 (0x18)`<br>`JSOP_RSH: 25 (0x19)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval OP rval)` |
 
-<p>Pops the top two values <code>lval</code> and <code>rval</code> from the stack, then pushes
-the result of the operation applied to the operands.
-</p>
+##### `DupAt`
 
-##### JSOP_URSH [-2, +1] (LEFTASSOC, ARITH)
+**Operands:** `(uint24_t n)`
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `26 (0x1a)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `lval, rval` |
-| **Stack Defs** | `(lval &gt;&gt;&gt; rval)` |
+**Stack:** `v[n], v[n-1], ..., v[1], v[0]` &rArr; `v[n], v[n-1], ..., v[1], v[0], v[n]`
 
-<p>Pops the top two values <code>lval</code> and <code>rval</code> from the stack, then pushes
-<code>lval &gt;&gt;&gt; rval</code>.
-</p>
+Push a copy of the nth value from the top of the stack.
 
-#### Logical Operators ####
+`n` must be less than the current stack depth.
 
 
 
-##### JSOP_NOT [-1, +1] (ARITH, DETECTING)
+##### `Swap`
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `32 (0x20)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(!val)` |
 
-<p>Pops the value <code>val</code> from the stack, then pushes <code>!val</code>.
-</p>
+**Stack:** `v1, v2` &rArr; `v2, v1`
 
-#### Special Operators ####
+Swap the top two values on the stack.
 
 
 
-##### JSOP_DELELEM [-2, +1] (BYTE , ELEM, CHECKSLOPPY)
+##### `Pick`
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `38 (0x26)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval` |
-| **Stack Defs** | `succeeded` |
+**Operands:** `(uint8_t n)`
 
-<p>Pops the top two values on the stack as <code>propval</code> and <code>obj</code>,
-deletes <code>propval</code> property from <code>obj</code>, pushes <code>true</code>  onto the stack if
-succeeded, <code>false</code> if not.
-</p>
-
-##### JSOP_DELPROP [-1, +1] (ATOM, PROP, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `37 (0x25)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `succeeded` |
+**Stack:** `v[n], v[n-1], ..., v[1], v[0]` &rArr; `v[n-1], ..., v[1], v[0], v[n]`
 
-<p>Pops the top of stack value, deletes property from it, pushes <code>true</code> onto
-the stack if succeeded, <code>false</code> if not.
-</p>
+Pick the nth element from the stack and move it to the top of the stack.
 
-##### JSOP_IN [-2, +1] (LEFTASSOC)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `113 (0x71)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `id, obj` |
-| **Stack Defs** | `(id in obj)` |
 
-<p>Pops the top two values <code>id</code> and <code>obj</code> from the stack, then pushes
-<code>id in obj</code>.  This will throw a <code>TypeError</code> if <code>obj</code> is not an object.
-</p>
-<p>Note that <code>obj</code> is the top value.
-</p>
+##### `Unpick`
 
-##### JSOP_INSTANCEOF [-2, +1] (LEFTASSOC, TMPSLOT)
+**Operands:** `(uint8_t n)`
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `114 (0x72)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, ctor` |
-| **Stack Defs** | `(obj instanceof ctor)` |
+**Stack:** `v[n], v[n-1], ..., v[1], v[0]` &rArr; `v[0], v[n], v[n-1], ..., v[1]`
 
-<p>Pops the top two values <code>obj</code> and <code>ctor</code> from the stack, then pushes
-<code>obj instanceof ctor</code>.  This will throw a <code>TypeError</code> if <code>obj</code> is not an
-object.
-</p>
+Move the top of the stack value under the `n`th element of the stack.
+`n` must not be 0.
 
-##### JSOP_STRICTDELPROP [-1, +1] (ATOM, PROP, CHECKSTRICT)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `46 (0x2e)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `succeeded` |
-
-<p>Pops the top of stack value and attempts to delete the given property
-from it. Pushes <code>true</code> onto success, else throws a TypeError per strict
-mode property-deletion requirements.
-</p>
-
-##### JSOP_TYPEOF [-1, +1] (DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `39 (0x27)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(typeof val)` |
-
-<p>Pops the value <code>val</code> from the stack, then pushes <code>typeof val</code>.
-</p>
-
-##### JSOP_TYPEOFEXPR [-1, +1] (DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `197 (0xc5)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `(typeof val)` |
-
-<p>Pops the top stack value as <code>val</code> and pushes <code>typeof val</code>.  Note that
-this opcode isn't used when, in the original source code, <code>val</code> is a
-name -- see <code><code>JSOP_TYPEOF</code></code> for that.
-(This is because <code>typeof undefinedName === "undefined"</code>.)
-</p>
-
-##### JSOP_VOID [-1, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `40 (0x28)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `undefined` |
-
-<p>Pops the top value on the stack and pushes <code>undefined</code>.
-</p>
-
-#### Stack Operations ####
-
-
-
-##### JSOP_DUP [-1, +2]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `12 (0x0c)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | `v, v` |
-
-<p>Pushes a copy of the top value on the stack.
-</p>
-
-##### JSOP_DUP2 [-2, +4]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `13 (0x0d)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v1, v2` |
-| **Stack Defs** | `v1, v2, v1, v2` |
-
-<p>Duplicates the top two values on the stack.
-</p>
-
-##### JSOP_DUPAT [-0, +1] (UINT24)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `44 (0x2c)` |
-| **Operands**   | `uint24_t n` |
-| **Length**     | 4 |
-| **Stack Uses** | `v[n], v[n-1], ..., v[1], v[0]` |
-| **Stack Defs** | `v[n], v[n-1], ..., v[1], v[0], v[n]` |
-
-<p>Duplicates the Nth value from the top onto the stack.
-</p>
-
-##### JSOP_PICK [-0, +0] (UINT8, TMPSLOT2)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `133 (0x85)` |
-| **Operands**   | `uint8_t n` |
-| **Length**     | 2 |
-| **Stack Uses** | `v[n], v[n-1], ..., v[1], v[0]` |
-| **Stack Defs** | `v[n-1], ..., v[1], v[0], v[n]` |
-
-<p>Picks the nth element from the stack and moves it to the top of the
-stack.
-</p>
-
-##### JSOP_POP [-1, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `81 (0x51)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top value off the stack.
-</p>
-
-##### JSOP_POPN [-n, +0] (UINT16)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `11 (0x0b)` |
-| **Operands**   | `uint16_t n` |
-| **Length**     | 3 |
-| **Stack Uses** | `v[n-1], ..., v[1], v[0]` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top <code>n</code> values from the stack.
-</p>
-
-##### JSOP_SWAP [-2, +2]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `10 (0x0a)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v1, v2` |
-| **Stack Defs** | `v2, v1` |
-
-<p>Swaps the top two values on the stack. This is useful for things like
-post-increment/decrement.
-</p>
-
-#### Debugger ####
-
-
-
-##### JSOP_DEBUGAFTERYIELD [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `208 (0xd0)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>Bytecode emitted after <code>yield</code> expressions to help the Debugger
-fix up the frame in the JITs. No-op in the interpreter.
-</p>
-
-
-### Literals ###
-
-#### Constants ####
-
-
-
-##### JSOP_DOUBLE [-0, +1] (DOUBLE)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `60 (0x3c)` |
-| **Operands**   | `uint32_t constIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes numeric constant onto the stack.
-</p>
-
-##### JSOP_FALSE [-0, +1]
-##### JSOP_TRUE [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `JSOP_FALSE: 66 (0x42)`<br>`JSOP_TRUE: 67 (0x43)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `true/false` |
-
-<p>Pushes boolean value onto the stack.
-</p>
-
-##### JSOP_INT32 [-0, +1] (INT32)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `216 (0xd8)` |
-| **Operands**   | `int32_t val` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes 32-bit int immediate integer operand onto the stack.
-</p>
-
-##### JSOP_INT8 [-0, +1] (INT8)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `215 (0xd7)` |
-| **Operands**   | `int8_t val` |
-| **Length**     | 2 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes 8-bit int immediate integer operand onto the stack.
-</p>
-
-##### JSOP_NULL [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `64 (0x40)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `null` |
-
-<p>Pushes <code>null</code> onto the stack.
-</p>
-
-##### JSOP_ONE [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `63 (0x3f)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `1` |
-
-<p>Pushes <code>1</code> onto the stack.
-</p>
-
-##### JSOP_STRING [-0, +1] (ATOM)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `61 (0x3d)` |
-| **Operands**   | `uint32_t atomIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `string` |
-
-<p>Pushes string constant onto the stack.
-</p>
-
-##### JSOP_SYMBOL [-0, +1] (UINT8)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `45 (0x2d)` |
-| **Operands**   | `uint8_t n, the JS::SymbolCode of the symbol to use` |
-| **Length**     | 2 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `symbol` |
-
-<p>Push a well-known symbol onto the operand stack.
-</p>
-
-##### JSOP_UINT16 [-0, +1] (UINT16)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `88 (0x58)` |
-| **Operands**   | `uint16_t val` |
-| **Length**     | 3 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes unsigned 16-bit int immediate integer operand onto the stack.
-</p>
-
-##### JSOP_UINT24 [-0, +1] (UINT24)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `188 (0xbc)` |
-| **Operands**   | `uint24_t val` |
-| **Length**     | 4 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `val` |
-
-<p>Pushes unsigned 24-bit int immediate integer operand onto the stack.
-</p>
-
-##### JSOP_UNDEFINED [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `1 (0x01)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `undefined` |
-
-<p>Pushes <code>undefined</code> onto the stack.
-</p>
-
-##### JSOP_UNINITIALIZED [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `142 (0x8e)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `uninitialized` |
-
-<p>Pushes a <code>JS_UNINITIALIZED_LEXICAL</code> value onto the stack, representing an
-uninitialized lexical binding.
-</p>
-<p>This opcode is used with the <code>JSOP_INITLET</code> opcode.
-</p>
-
-##### JSOP_ZERO [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `62 (0x3e)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `0` |
-
-<p>Pushes <code>0</code> onto the stack.
-</p>
-
-#### Object ####
-
-
-
-##### JSOP_CALLELEM [-2, +1] (BYTE , ELEM, TYPESET, LEFTASSOC)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `193 (0xc1)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval` |
-| **Stack Defs** | `obj[propval]` |
-
-<p>Pops the top two values on the stack as <code>propval</code> and <code>obj</code>, pushes
-<code>propval</code> property of <code>obj</code> onto the stack.
-</p>
-<p>Like <code>JSOP_GETELEM</code> but for call context.
-</p>
-
-##### JSOP_CALLPROP [-1, +1] (ATOM, PROP, TYPESET, TMPSLOT3)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `184 (0xb8)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `obj[name]` |
-
-<p>Pops the top of stack value, pushes property of it onto the stack.
-</p>
-<p>Like <code>JSOP_GETPROP</code> but for call context.
-</p>
-
-##### JSOP_CALLSITEOBJ [-0, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `101 (0x65)` |
-| **Operands**   | `uint32_t objectIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes the call site object specified by objectIndex onto the stack. Defines the raw
-property specified by objectIndex + 1 on the call site object and freezes both the call site
-object as well as its raw property.
-</p>
-
-##### JSOP_GETELEM [-2, +1] (BYTE , ELEM, TYPESET, LEFTASSOC)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `55 (0x37)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval` |
-| **Stack Defs** | `obj[propval]` |
-
-<p>Pops the top two values on the stack as <code>propval</code> and <code>obj</code>, pushes
-<code>propval</code> property of <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_GETPROP [-1, +1] (ATOM, PROP, TYPESET, TMPSLOT3)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `53 (0x35)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `obj[name]` |
-
-<p>Pops the top of stack value, pushes property of it onto the stack.
-</p>
-
-##### JSOP_GETXPROP [-1, +1] (ATOM, PROP, TYPESET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `195 (0xc3)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `obj[name]` |
-
-<p>Pops the top of stack value, gets an extant property value of it,
-throwing ReferenceError if the identified property does not exist.
-</p>
-
-##### JSOP_INITELEM [-3, +1] (ELEM, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `94 (0x5e)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, id, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a numeric property in an object literal, like <code>{1: x}</code>.
-</p>
-<p>Pops the top three values on the stack as <code>val</code>, <code>id</code> and <code>obj</code>, defines
-<code>id</code> property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITELEM_GETTER [-3, +1] (ELEM, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `99 (0x63)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, id, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a numeric getter in an object literal like
-<code>{get 2() {}}</code>.
-</p>
-<p>Pops the top three values on the stack as <code>val</code>, <code>id</code> and <code>obj</code>, defines
-<code>id</code> getter of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITELEM_SETTER [-3, +1] (ELEM, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `100 (0x64)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, id, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a numeric setter in an object literal like
-<code>{set 2(v) {}}</code>.
-</p>
-<p>Pops the top three values on the stack as <code>val</code>, <code>id</code> and <code>obj</code>, defines
-<code>id</code> setter of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITPROP [-2, +1] (ATOM, PROP, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `93 (0x5d)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a named property in an object literal, like <code>{a: x}</code>.
-</p>
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code>, defines
-<code>nameIndex</code> property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITPROP_GETTER [-2, +1] (ATOM, PROP, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `97 (0x61)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a getter in an object literal.
-</p>
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code>, defines getter
-of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITPROP_SETTER [-2, +1] (ATOM, PROP, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `98 (0x62)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize a setter in an object literal.
-</p>
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code>, defines setter
-of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_MUTATEPROTO [-2, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `194 (0xc2)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, newProto` |
-| **Stack Defs** | `succeeded` |
-
-<p><code>__proto__: v</code> inside an object initializer.
-</p>
-<p>Pops the top two values on the stack as <code>newProto</code> and <code>obj</code>, sets
-prototype of <code>obj</code> as <code>newProto</code>, pushes <code>true</code> onto the stack if
-succeeded, <code>false</code> if not.
-</p>
-
-##### JSOP_NEWINIT [-0, +1] (UINT8)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `89 (0x59)` |
-| **Operands**   | `uint8_t kind (, uint24_t extra)` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes newly created object onto the stack.
-</p>
-<p>This opcode takes the kind of initializer (<code>JSP</code>roto_Array or
-<code>JSP</code>roto_Object).
-</p>
-<p>This opcode has an extra byte so it can be exchanged with <code>JSOP_NEWOBJECT</code>
-during emit.
-</p>
-
-##### JSOP_NEWOBJECT [-0, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `91 (0x5b)` |
-| **Operands**   | `uint32_t baseobjIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes newly created object onto the stack.
-</p>
-<p>This opcode takes an object with the final shape, which can be set at
-the start and slots then filled in directly.
-</p>
-
-##### JSOP_OBJECT [-0, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `80 (0x50)` |
-| **Operands**   | `uint32_t objectIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes deep-cloned object literal or singleton onto the stack.
-</p>
-
-##### JSOP_SETELEM [-3, +1] (BYTE , ELEM, SET, DETECTING, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `56 (0x38)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top three values on the stack as <code>val</code>, <code>propval</code> and <code>obj</code>,
-sets <code>propval</code> property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the
-stack.
-</p>
-
-##### JSOP_SETPROP [-2, +1] (ATOM, PROP, SET, DETECTING, CHECKSLOPPY)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `54 (0x36)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code> and performs
-<code>obj.prop = val</code>, pushing <code>val</code> back onto the stack.
-</p>
-
-##### JSOP_STRICTDELELEM [-2, +1] (ELEM, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `47 (0x2f)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval` |
-| **Stack Defs** | `succeeded` |
-
-<p>Pops the top two values on the stack as <code>propval</code> and <code>obj</code>,
-and attempts to delete <code>propval</code> property from <code>obj</code>. Pushes <code>true</code> onto
-the stack on success, else throws a TypeError per strict mode property
-deletion requirements.
-</p>
-
-##### JSOP_STRICTSETELEM [-3, +1] (BYTE , ELEM, SET, DETECTING, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `57 (0x39)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, propval, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top three values on the stack as <code>val</code>, <code>propval</code> and <code>obj</code>,
-sets <code>propval</code> property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the
-stack. Throws a TypeError if the set fails, per strict mode
-semantics.
-</p>
-
-##### JSOP_STRICTSETPROP [-2, +1] (ATOM, PROP, SET, DETECTING, CHECKSTRICT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `48 (0x30)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `val` |
-
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code>, and performs
-<code>obj.prop = val</code>, pushing <code>val</code> back onto the stack. Throws a TypeError
-if the set-operation failed (per strict mode semantics).
-</p>
-
-##### JSOP_TOID [-1, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `225 (0xe1)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `id` |
-| **Stack Defs** | `(jsid of id)` |
-
-<p>Pops the top of stack value, converts it into a jsid (int or string), and
-pushes it onto the stack.
-</p>
-
-#### Array ####
-
-
-
-##### JSOP_ARRAYPUSH [-2, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `206 (0xce)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `v, obj` |
-| **Stack Defs** | ` ` |
-
-<p>Pops the top two values on the stack as <code>obj</code> and <code>v</code>, pushes <code>v</code> to
-<code>obj</code>.
-</p>
-<p>This opcode is used for Array Comprehension.
-</p>
-
-##### JSOP_HOLE [-0, +1]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `218 (0xda)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `hole` |
-
-<p>Pushes a <code>JS_ELEMENTS_HOLE</code> value onto the stack, representing an omitted
-property in an array literal (e.g. property 0 in the array <code>[, 1]</code>).
-</p>
-<p>This opcode is used with the <code>JSOP_NEWARRAY</code> opcode.
-</p>
-
-##### JSOP_INITELEM_ARRAY [-2, +1] (UINT24, ELEM, SET, DETECTING)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `96 (0x60)` |
-| **Operands**   | `uint24_t index` |
-| **Length**     | 4 |
-| **Stack Uses** | `obj, val` |
-| **Stack Defs** | `obj` |
-
-<p>Initialize an array element.
-</p>
-<p>Pops the top two values on the stack as <code>val</code> and <code>obj</code>, sets <code>index</code>
-property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> onto the stack.
-</p>
-
-##### JSOP_INITELEM_INC [-3, +2] (ELEM, SET)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `95 (0x5f)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `obj, index, val` |
-| **Stack Defs** | `obj, (index + 1)` |
-
-<p>Pops the top three values on the stack as <code>val</code>, <code>index</code> and <code>obj</code>, sets
-<code>index</code> property of <code>obj</code> as <code>val</code>, pushes <code>obj</code> and <code>index + 1</code> onto
-the stack.
-</p>
-<p>This opcode is used in Array literals with spread and spreadcall
-arguments.
-</p>
-
-##### JSOP_LENGTH [-1, +1] (ATOM, PROP, TYPESET, TMPSLOT3)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `217 (0xd9)` |
-| **Operands**   | `uint32_t nameIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | `obj` |
-| **Stack Defs** | `obj['length']` |
-
-<p>Pops the top of stack value, pushes the <code>length</code> property of it onto the
-stack.
-</p>
-
-##### JSOP_NEWARRAY [-0, +1] (UINT24)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `90 (0x5a)` |
-| **Operands**   | `uint24_t length` |
-| **Length**     | 4 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes newly created array onto the stack.
-</p>
-<p>This opcode takes the final length, which is preallocated.
-</p>
-
-##### JSOP_NEWARRAY_COPYONWRITE [-0, +1] (OBJECT)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `102 (0x66)` |
-| **Operands**   | `uint32_t objectIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `obj` |
-
-<p>Pushes a newly created array onto the stack, whose elements are the same
-as that of a template object's copy on write elements.
-</p>
-
-
-#### RegExp ####
-
-
-
-##### JSOP_REGEXP [-0, +1] (REGEXP)
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `160 (0xa0)` |
-| **Operands**   | `uint32_t regexpIndex` |
-| **Length**     | 5 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | `regexp` |
-
-<p>Pushes a regular expression literal onto the stack.
-It requires special "clone on exec" handling.
-</p>
 
 ### Other ###
 
 
 
-##### JSOP_FORCEINTERPRETER [-0, +0]
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `207 (0xcf)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
-
-<p>No-op bytecode only emitted in some self-hosted functions. Not handled by
-the JITs so the script always runs in the interpreter.
-</p>
+##### `Nop`
 
 
-##### JSOP_LINENO [-0, +0] (UINT16)
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `119 (0x77)` |
-| **Operands**   | `uint32_t lineno` |
-| **Length**     | 3 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
+Do nothing. This is used when we need distinct bytecode locations for
+various mechanisms.
 
-<p>Embedded lineno to speedup <code>pc-&gt;line</code> mapping.
-</p>
 
-##### JSOP_NOP [-0, +0]
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `0 (0x00)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | ` ` |
-| **Stack Defs** | ` ` |
+##### `Lineno`
 
-<p>No operation is performed.
-</p>
+**Operands:** `(uint32_t lineno)`
 
-##### JSOP_TOSTRING [-1, +1]
 
-|                |     |
-| -------------- | --- |
-| **Value**      | `228 (0xe4)` |
-| **Operands**   | ` ` |
-| **Length**     | 1 |
-| **Stack Uses** | `val` |
-| **Stack Defs** | `ToString(val)` |
+No-op instruction emitted immediately after `JSOp::*Eval` so that direct
+eval does not have to do slow pc-to-line mapping.
 
-<p>Converts the value on the top of the stack to a String
-</p>
+The `lineno` operand should agree with this script's source notes about
+the line number of the preceding `*Eval` instruction.
+
+
+
+##### `NopDestructuring`
+
+
+
+No-op instruction to hint that the top stack value is uninteresting.
+
+This affects only debug output and some error messages.
+In array destructuring, we emit bytecode that is roughly equivalent to
+`result.done ? undefined : result.value`.
+`NopDestructuring` is emitted after the `undefined`, so that the
+expression decompiler and disassembler know to casually ignore the
+possibility of `undefined`, and render the result of the conditional
+expression simply as "`result.value`".
+
+
+
+##### `ForceInterpreter`
+
+
+
+No-op instruction only emitted in some self-hosted functions. Not
+handled by the JITs or Baseline Interpreter so the script always runs in
+the C++ interpreter.
+
+
+
+##### `DebugCheckSelfHosted`
+
+
+**Stack:** `checkVal` &rArr; `checkVal`
+
+Examine the top stack value, asserting that it's either a self-hosted
+function or a self-hosted intrinsic. This does nothing in a non-debug
+build.
+
+
+
+##### `InstrumentationActive`
+
+
+**Stack:** &rArr; `val`
+
+Push a boolean indicating if instrumentation is active.
+
+
+
+##### `InstrumentationCallback`
+
+
+**Stack:** &rArr; `val`
+
+Push the instrumentation callback for the current realm.
+
+
+
+##### `InstrumentationScriptId`
+
+
+**Stack:** &rArr; `val`
+
+Push the current script's instrumentation ID.
+
+
+
+##### `Debugger`
+
+
+
+Break in the debugger, if one is attached. Otherwise this is a no-op.
+
+The [`Debugger` API][1] offers a way to hook into this instruction.
+
+Implements: [Evaluation for *DebuggerStatement*][2].
+
+[1]: https://developer.mozilla.org/en-US/docs/Tools/Debugger-API/Debugger
+[2]: https://tc39.es/ecma262/#sec-debugger-statement-runtime-semantics-evaluation
+
+
 

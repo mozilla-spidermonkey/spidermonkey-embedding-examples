@@ -1,5 +1,8 @@
-#!/usr/bin/env -S python -B
+#!/usr/bin/env -S python3 -B
 # coding: utf-8
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at http://mozilla.org/MPL/2.0/.
 
 """ Usage: make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE
 
@@ -13,64 +16,66 @@ import sys
 import os
 from xml.sax.saxutils import escape
 
-SOURCE_BASE = 'https://searchfox.org/mozilla-esr68/source'
+SOURCE_BASE = 'https://searchfox.org/mozilla-esr78/source'
+
+FORMAT_TO_IGNORE = {
+    "JOF_BYTE",
+    "JOF_UINT8",
+    "JOF_UINT16",
+    "JOF_UINT24",
+    "JOF_UINT32",
+    "JOF_INT8",
+    "JOF_INT32",
+    "JOF_TABLESWITCH",
+    "JOF_REGEXP",
+    "JOF_DOUBLE",
+    "JOF_LOOPHEAD",
+    "JOF_BIGINT",
+}
 
 
-def override(value, override_value):
-    if override_value != '':
-        return override_value
-
-    return value
-
-
-def format_flags(flags):
-    flags = list(filter(lambda x: x != 'JOF_BYTE', flags))
-    if len(flags) == 0:
+def format_format(format):
+    format = [flag for flag in format if flag not in FORMAT_TO_IGNORE]
+    if len(format) == 0:
         return ''
+    return '**Format:** {format}\n'.format(format=', '.join(format))
 
-    flags = map(lambda x: x.replace('JOF_', ''), flags)
-    return ' ({flags})'.format(flags=', '.join(flags))
+
+def maybe_escape(value, format_str, fallback=""):
+    if value:
+        return format_str.format(escape(value))
+    return fallback
+
+
+OPCODE_FORMAT = """\
+##### {names}
+
+{operands}
+{stack}
+{desc}
+{format}\
+"""
 
 
 def print_opcode(opcode, out):
-    names_template = '{name} [-{nuses}, +{ndefs}]{flags}'
-    opcodes = sorted([opcode] + opcode.group,
-                     key=lambda opcode: opcode.name)
-    names = map(lambda code: names_template.format(name=escape(code.name),
-                                                   nuses=override(code.nuses,
-                                                                  opcode.nuses_override),
-                                                   ndefs=override(code.ndefs,
-                                                                  opcode.ndefs_override),
-                                                   flags=format_flags(code.flags)),
-                opcodes)
-    if len(opcodes) == 1:
-        values = ['{value} (0x{value:02x})'.format(value=opcode.value)]
+    opcodes = [opcode] + opcode.group
+    names = ', '.join(maybe_escape(code.op, "`{}`") for code in opcodes)
+    operands = maybe_escape(opcode.operands, "**Operands:** `({})`\n")
+    stack_uses = maybe_escape(opcode.stack_uses, "`{}` ")
+    stack_defs = maybe_escape(opcode.stack_defs, " `{}`")
+    if stack_uses or stack_defs:
+        stack = "**Stack:** {}&rArr;{}\n".format(stack_uses, stack_defs)
     else:
-        values_template = '{name}: {value} (0x{value:02x})'
-        values = map(lambda code: values_template.format(name=escape(code.name),
-                                                         value=code.value),
-                     opcodes)
+        stack = ""
 
-    print("""##### {names}
-
-|                |     |
-| -------------- | --- |
-| **Value**      | `{values}` |
-| **Operands**   | `{operands}` |
-| **Length**     | {length} |
-| **Stack Uses** | `{stack_uses}` |
-| **Stack Defs** | `{stack_defs}` |
-
-{desc}
-""".format(names='\n##### '.join(names),
-           values='`<br>`'.join(values),
-           operands=escape(opcode.operands) or " ",
-           length=escape(override(opcode.length,
-                                  opcode.length_override)),
-           stack_uses=escape(opcode.stack_uses) or " ",
-           stack_defs=escape(opcode.stack_defs) or " ",
-           desc=opcode.desc),  # desc is already escaped
-          file=out)
+    print(OPCODE_FORMAT.format(
+        id=opcodes[0].op,
+        names=names,
+        operands=operands,
+        stack=stack,
+        desc=opcode.desc,
+        format=format_format(opcode.format_),
+    ), file=out)
 
 
 id_cache = dict()
@@ -114,10 +119,6 @@ There is always a "Top of Stack" (TOS) that corresponds to the latest value
 pushed onto the expression stack.
 All bytecodes implicitly operate in terms of this location.
 
-## Bytecode listing ##
-
-All opcodes are annotated with a `[-popcount, +pushcount]` to represent the
-overall stack-effects of their execution.
 
 """.format(source_base=SOURCE_BASE), file=out)
 
@@ -127,9 +128,8 @@ overall stack-effects of their execution.
             if type_name:
                 print('#### {name} ####\n'.format(name=type_name), file=out)
             print('\n', file=out)
-            for opcode_ in sorted(opcodes,
-                                  key=lambda opcode: opcode.sort_key):
-                print_opcode(opcode_, out)
+            for opcode in opcodes:
+                print_opcode(opcode, out)
 
 
 if __name__ == '__main__':
