@@ -56,3 +56,4 @@ in the `meson.build` file, and add a description of it to this
   lazy property resolution.
   Use this in cases where defining properties and methods in your class
   upfront might be slow.
+- **modules.cpp** - Example of how to load ES Module sources.

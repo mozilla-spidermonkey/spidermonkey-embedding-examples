@@ -69,11 +69,6 @@ class ReplGlobal {
 constexpr JSClass ReplGlobal::klass;
 constexpr JSFunctionSpec ReplGlobal::functions[];
 
-static void die(const char* why) {
-  std::cerr << "fatal error:" << why << std::endl;
-  exit(1);
-}
-
 std::string FormatString(JSContext* cx, JS::HandleString string) {
   std::string buf = "\"";
 
@@ -129,19 +124,6 @@ std::string FormatResult(JSContext* cx, JS::HandleValue value) {
   }
 
   return bytes.get();
-}
-
-static void ReportAndClearException(JSContext* cx) {
-  /* Get exception object before printing and clearing exception. */
-  JS::ExceptionStack stack(cx);
-  if (!JS::StealPendingExceptionStack(cx, &stack))
-    die("Uncatchable exception thrown, out of memory or something");
-
-  JS::ErrorReportBuilder report(cx);
-  if (!report.init(cx, stack, JS::ErrorReportBuilder::WithSideEffects))
-    die("Couldn't build error report");
-
-  JS::PrintError(cx, stderr, report, false);
 }
 
 JSObject* ReplGlobal::create(JSContext* cx) {
@@ -207,7 +189,9 @@ void ReplGlobal::loop(JSContext* cx, JS::HandleObject global) {
                                             buffer.length()));
 
     if (!EvalAndPrint(cx, buffer, startline)) {
-      if (!priv(global)->m_shouldQuit) ReportAndClearException(cx);
+      if (!priv(global)->m_shouldQuit) {
+        boilerplate::ReportAndClearException(cx);
+      }
     }
 
     js::RunJobs(cx);
