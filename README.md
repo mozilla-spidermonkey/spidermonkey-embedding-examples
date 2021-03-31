@@ -11,10 +11,15 @@ earlier `esr` branches for previous versions.
 
 # Docs #
 
-Check the `docs/` directory for howtos and documentation.
+Check the [`docs/`](docs/) directory for howtos and documentation, such as:
+
+-  [Building SpiderMonkey for embedding](docs/Building%20SpiderMonkey.md )
+-  [A JSAPI Introduction](docs/JSAPI%20Introduction.md)
+-  [The Migration Guide from previous versions](docs/Migration%20Guide.md)
+
 
 # Examples #
 
-The `examples/` directory contains code examples.
+The [`examples/`](examples/) directory contains code examples.
 See the [README in that directory](examples/README.md) for build
 instructions.
