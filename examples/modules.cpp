@@ -46,7 +46,7 @@ static std::map<std::u16string, JS::PersistentRootedObject> moduleRegistry;
 // hardcodes sources, but an embedding would normally load files here.
 static JSObject* ExampleResolveHook(JSContext* cx,
                                     JS::HandleValue modulePrivate,
-                                    JS::HandleString spec) {
+                                    JS::HandleObject spec) {
   // Convert specifier to a std::u16char for simplicity.
   JS::UniqueTwoByteChars specChars(JS_CopyStringCharsZ(cx, spec));
   if (!specChars) {

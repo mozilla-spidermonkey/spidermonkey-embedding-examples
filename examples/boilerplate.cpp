@@ -1,6 +1,7 @@
 #include <jsapi.h>
 
 #include <js/Initialization.h>
+#include <js/Exception.h>
 
 #include "boilerplate.h"
 

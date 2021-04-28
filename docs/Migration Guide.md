@@ -3,6 +3,12 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
+## ESR 78 to ESR 90 ##
+
+- JS::ExceptionStack now requires including js/Exception.h (Bug 1626100)
+- JS_New replaced with JS::Construct. (Bug 1491055)
+- SetModuleResolveHook changed signature. (Bug 1668330)
+
 ## ESR 68 to ESR 78 ##
 
 ### Requirements ###

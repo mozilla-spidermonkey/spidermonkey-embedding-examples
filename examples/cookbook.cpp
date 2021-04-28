@@ -205,7 +205,7 @@ static bool CreateObject(JSContext* cx) {
  *
  * - look up the constructor, Person
  * - prepare the arguments ("Dave", 24)
- * - call JS_New to simulate the new keyword
+ * - call JS::Construct to simulate the new keyword
  */
 static bool ConstructObjectWithNew(JSContext* cx, JS::HandleObject global) {
   // Step 1 - Get the value of `Person` and check that it is an object.
@@ -226,13 +226,14 @@ static bool ConstructObjectWithNew(JSContext* cx, JS::HandleObject global) {
   args[1].setInt32(24);
 
   // Step 3 - Call `new Person(...args)`, passing the arguments.
-  JS::RootedObject obj(cx, JS_New(cx, constructor, args));
+  JS::RootedObject obj(cx);
+  if (!JS::Construct(cx, constructor_val, args, &obj)) return false;
   if (!obj) return false;
 
   // (If your constructor doesn't take any arguments, you can skip the second
   // step and call step 3 like this:)
-  obj = JS_New(cx, constructor, JS::HandleValueArray::empty());
-  if (!obj) return false;
+  if (!JS::Construct(cx, constructor_val, JS::HandleValueArray::empty(), &obj))
+    return false;
 
   return true;
 }
