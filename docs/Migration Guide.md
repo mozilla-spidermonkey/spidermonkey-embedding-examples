@@ -8,6 +8,8 @@ of SpiderMonkey to the next ESR version.
 - JS::ExceptionStack now requires including js/Exception.h (Bug 1626100)
 - JS_New replaced with JS::Construct. (Bug 1491055)
 - SetModuleResolveHook changed signature. (Bug 1668330)
+- ModuleEvaluate gained a new result out-parameter to represent the promise in Top-Level-Await (Bug 1519100)
+- Insead of a specifier string, ResolveHooks recieve a ModuleRequest, which contains the specifier (Bug 1668330)
 
 ## ESR 68 to ESR 78 ##
 

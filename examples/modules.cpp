@@ -46,9 +46,16 @@ static std::map<std::u16string, JS::PersistentRootedObject> moduleRegistry;
 // hardcodes sources, but an embedding would normally load files here.
 static JSObject* ExampleResolveHook(JSContext* cx,
                                     JS::HandleValue modulePrivate,
-                                    JS::HandleObject spec) {
+                                    JS::HandleObject moduleRequest) {
+  // Extract module specifier string.
+  JS::Rooted<JSString*> specifierString(
+      cx, JS::GetModuleRequestSpecifier(cx, moduleRequest));
+  if (!specifierString) {
+    return nullptr;
+  }
+
   // Convert specifier to a std::u16char for simplicity.
-  JS::UniqueTwoByteChars specChars(JS_CopyStringCharsZ(cx, spec));
+  JS::UniqueTwoByteChars specChars(JS_CopyStringCharsZ(cx, specifierString));
   if (!specChars) {
     return nullptr;
   }
@@ -104,8 +111,11 @@ static bool ModuleExample(JSContext* cx) {
     return false;
   }
 
+  // Result value, used for top-level await.
+  JS::RootedValue rval(cx);
+
   // Execute the module bytecode.
-  if (!JS::ModuleEvaluate(cx, mod)) {
+  if (!JS::ModuleEvaluate(cx, mod, &rval)) {
     boilerplate::ReportAndClearException(cx);
     return false;
   }
