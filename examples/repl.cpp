@@ -15,6 +15,7 @@
 #include <js/ErrorReport.h>
 #include <js/Exception.h>
 #include <js/Initialization.h>
+#include <js/Object.h>
 #include <js/SourceText.h>
 #include <js/Warnings.h>
 
@@ -36,7 +37,7 @@ class ReplGlobal {
   ReplGlobal(void) : m_shouldQuit(false) {}
 
   static ReplGlobal* priv(JSObject* global) {
-    auto* retval = static_cast<ReplGlobal*>(JS_GetPrivate(global));
+    auto* retval = static_cast<ReplGlobal*>(JS::GetPrivate(global));
     assert(retval);
     return retval;
   }
@@ -102,7 +103,7 @@ std::string FormatResult(JSContext* cx, JS::HandleValue value) {
   if (!str) {
     JS_ClearPendingException(cx);
     if (value.isObject()) {
-      const JSClass* klass = JS_GetClass(&value.toObject());
+      const JSClass* klass = JS::GetClass(&value.toObject());
       if (klass)
         str = JS_NewStringCopyZ(cx, klass->name);
       else
@@ -133,7 +134,7 @@ JSObject* ReplGlobal::create(JSContext* cx) {
                                              JS::FireOnNewGlobalHook, options));
 
   ReplGlobal* priv = new ReplGlobal();
-  JS_SetPrivate(global, priv);
+  JS::SetPrivate(global, priv);
 
   // Define any extra global functions that we want in our environment.
   JSAutoRealm ar(cx, global);

@@ -6,6 +6,9 @@
 
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
+#include <js/experimental/TypedData.h>
+#include <js/friend/ErrorMessages.h>
+#include <js/Object.h>
 #include <js/Initialization.h>
 #include <js/SourceText.h>
 
@@ -64,7 +67,7 @@ class Crc {
   }
 
   static Crc* getPriv(JSObject* obj) {
-    return static_cast<Crc*>(JS_GetPrivate(obj));
+    return static_cast<Crc*>(JS::GetPrivate(obj));
   }
 
   static bool isPrototype(JSObject* obj) { return getPriv(obj) == nullptr; }
@@ -91,7 +94,7 @@ class Crc {
     if (!newObj) return false;
 
     Crc* priv = new Crc();
-    JS_SetPrivate(newObj, priv);
+    JS::SetPrivate(newObj, priv);
 
     args.rval().setObject(*newObj);
     return true;
@@ -181,7 +184,7 @@ class Crc {
     Crc* priv = getPriv(obj);
     if (priv) {
       delete priv;
-      JS_SetPrivate(obj, nullptr);
+      JS::SetPrivate(obj, nullptr);
     }
   }
 
@@ -226,7 +229,7 @@ class Crc {
 
     // Here's how we tell the prototype apart from instances. The private
     // pointer will be null.
-    JS_SetPrivate(proto, nullptr);
+    JS::SetPrivate(proto, nullptr);
     return true;
   }
 };

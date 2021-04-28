@@ -9,6 +9,7 @@
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/Initialization.h>
+#include <js/Object.h>
 #include <js/SourceText.h>
 #include <js/ValueArray.h>
 
@@ -751,8 +752,8 @@ static bool MyClassMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::RootedObject thisObj(cx);
   if (!args.computeThis(cx, &thisObj)) return false;
 
-  JS::RootedValue v_a(cx, JS_GetReservedSlot(thisObj, SlotA));
-  JS::RootedValue v_b(cx, JS_GetReservedSlot(thisObj, SlotB));
+  JS::RootedValue v_a(cx, JS::GetReservedSlot(thisObj, SlotA));
+  JS::RootedValue v_b(cx, JS::GetReservedSlot(thisObj, SlotB));
 
   double a, b;
   if (!JS::ToNumber(cx, v_a, &a) || !JS::ToNumber(cx, v_b, &b)) return false;
@@ -809,8 +810,8 @@ static bool MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
   // Slightly different from the 'private' properties in the JS example, here
   // we use reserved slots to store the a and b values. These are not accessible
   // from JavaScript.
-  JS_SetReservedSlot(thisObj, SlotA, args[0]);
-  JS_SetReservedSlot(thisObj, SlotB, args[1]);
+  JS::SetReservedSlot(thisObj, SlotA, args[0]);
+  JS::SetReservedSlot(thisObj, SlotB, args[1]);
 
   args.rval().setObject(*thisObj);
   return true;

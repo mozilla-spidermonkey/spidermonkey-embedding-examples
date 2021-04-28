@@ -10,6 +10,11 @@ of SpiderMonkey to the next ESR version.
 - SetModuleResolveHook changed signature. (Bug 1668330)
 - ModuleEvaluate gained a new result out-parameter to represent the promise in Top-Level-Await (Bug 1519100)
 - Insead of a specifier string, ResolveHooks recieve a ModuleRequest, which contains the specifier (Bug 1668330)
+- JS_{Get,Set}Private moved to JS::{Get,Set}Private in js/Object.h (Bug 1663365)
+- JS_GetClass moved to JS::GetClass in js/Object.h (Bug 1663365)
+- JS_{Get,Set}ReservedSlot moved to JS::{Get,Set}ReservedSlot in js/Object.h (Bug 1663365)
+- JS_IsUint8Array moved into js/experimental/TypedData.h (Bug 1656411)
+- js::GetErrorMessage moved to js/friend/ErrorMessages.h (Bug 1654927)
 
 ## ESR 68 to ESR 78 ##
 
