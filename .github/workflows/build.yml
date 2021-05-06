@@ -1,0 +1,58 @@
+name: Spidermonkey
+
+on:
+  push:
+    branches: [ esr78 ]
+  pull_request:
+    branches: [ esr78 ]
+
+env:
+  SHELL: /bin/bash
+  # ccache
+  CCACHE: ccache
+  # use clang/lld
+  CXX: clang++
+  CC: clang
+  LDFLAGS: -fuse-ld=lld
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: |
+        sudo apt install autoconf2.13 ccache llvm clang lld -y
+    - uses: actions-rs/toolchain@v1
+      with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          default: true
+    - name: Get SM pkg
+      run: ./tools/get_sm_78.sh
+    - name: ccache cache files
+      uses: actions/cache@v1.1.0
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.bz2') }}
+    - name: Build SpiderMonkey
+      run: |
+        tar -xf mozjs.tar.bz2
+        cd mozjs*
+        cd js/src
+        autoconf2.13
+        mkdir _build
+        cd _build
+        ../configure --disable-jemalloc --with-system-zlib \
+            --with-intl-api --enable-debug --enable-optimize
+        ccache -z
+        make
+        sudo make install
+        ccache -s
+    - name: Build Examples
+      run: |
+        meson _build
+        ninja -C _build
