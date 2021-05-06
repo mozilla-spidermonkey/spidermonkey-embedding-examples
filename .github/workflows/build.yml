@@ -16,6 +16,7 @@ env:
   CXX: clang++
   CC: clang
   LDFLAGS: -fuse-ld=lld
+  LD_LIBRARY_PATH: /usr/local/lib
 
 jobs:
   build:
