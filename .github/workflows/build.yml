@@ -5,6 +5,8 @@ on:
     branches: [ esr78 ]
   pull_request:
     branches: [ esr78 ]
+  schedule: 
+    - cron: "10 10 10 * *"
 
 env:
   SHELL: /bin/bash
@@ -56,5 +58,5 @@ jobs:
         ccache -s
     - name: Build Examples
       run: |
-        meson _build
+        meson _build || cat _build/meson-logs/meson-log.txt
         ninja -C _build
