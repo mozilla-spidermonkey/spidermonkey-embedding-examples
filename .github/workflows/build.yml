@@ -40,8 +40,10 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.bz2') }}
     - name: Build SpiderMonkey
       run: |
-        tar -xf mozjs.tar.bz2
-        cd mozjs*
+        mkdir -p /tmp/mozjs
+        tar -xf mozjs.tar.bz2 -C /tmp/mozjs
+        cd /tmp/mozjs
+        cd $(ls -d */|head -n 1)
         cd js/src
         autoconf2.13
         mkdir _build
