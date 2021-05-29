@@ -50,7 +50,7 @@ jobs:
         cd $(ls -d */|head -n 1)
         cd js/src
         autoconf2.13
-        bash $GITHUB_WORKSPACE/tools/generic_lib.sh $GITHUB_WORKSPACE/meason.build
+        bash $GITHUB_WORKSPACE/tools/generic_lib.sh $GITHUB_WORKSPACE/meson.build
         mkdir _build
         cd _build
         ../configure --disable-jemalloc --with-system-zlib \
