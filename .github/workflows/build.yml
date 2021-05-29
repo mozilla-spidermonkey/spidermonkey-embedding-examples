@@ -1,0 +1,65 @@
+name: Spidermonkey
+
+on:
+  push:
+    branches-ignore: [ esr* ]
+  pull_request:
+    branches-ignore: [ esr* ]
+  schedule: 
+    # every fifth day
+    - cron: "10 10 1,5,10,15,20,25 * *"
+
+env:
+  SHELL: /bin/bash
+  # ccache
+  CCACHE: ccache
+  # use clang/lld
+  CXX: clang++
+  CC: clang
+  LDFLAGS: -fuse-ld=lld
+  LD_LIBRARY_PATH: /usr/local/lib
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: |
+        sudo apt install autoconf2.13 ccache llvm clang lld meson ninja-build -y
+    - uses: actions-rs/toolchain@v1
+      with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          default: true
+    - name: Get SM pkg
+      run: ./tools/get_sm.sh
+    - name: ccache cache files
+      uses: actions/cache@v1.1.0
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.bz2') }}
+    - name: Build SpiderMonkey
+      run: |
+        mkdir -p /tmp/mozjs
+        tar -xf mozjs.tar.xz -C /tmp/mozjs
+        cd /tmp/mozjs
+        cd $(ls -d */|head -n 1)
+        cd js/src
+        autoconf2.13
+        bash $GITHUB_WORKSPACE/tools/generic_lib.sh $GITHUB_WORKSPACE/meson.build
+        mkdir _build
+        cd _build
+        ../configure --disable-jemalloc --with-system-zlib \
+            --with-intl-api --enable-debug --enable-optimize
+        ccache -z
+        make
+        sudo make install
+        ccache -s
+    - name: Build Examples
+      run: |
+        meson _build || cat _build/meson-logs/meson-log.txt
+        ninja -C _build
