@@ -63,3 +63,6 @@ jobs:
       run: |
         meson _build || cat _build/meson-logs/meson-log.txt
         ninja -C _build
+    - name: Run version
+      run: |
+        _build/version
