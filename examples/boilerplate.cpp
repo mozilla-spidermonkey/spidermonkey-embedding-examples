@@ -36,7 +36,7 @@ void boilerplate::ReportAndClearException(JSContext* cx) {
     exit(1);
   }
 
-  JS::PrintError(cx, stderr, report, false);
+  JS::PrintError(stderr, report, false);
 }
 
 // Initialize the JS environment, create a JSContext and run the example
