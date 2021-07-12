@@ -3,7 +3,7 @@
 This page lists a few tips to help you investigate issues related to use
 of the SpiderMonkey API.
 
-Many tips listed here are dealing with the `js78` JavaScript shell built
+Many tips listed here are dealing with the `js91` JavaScript shell built
 during the SpiderMonkey build process.
 If you want to implement these functions in your own code, you can look
 at how they are implemented in the source code of the JS shell.
@@ -63,7 +63,7 @@ and in parentheses, the `JSScript` pointer and the `jsbytecode` pointer
 (PC) executed.
 
 ```
-$ gdb --args js78
+$ gdb --args js91
 […]
 (gdb) b js::ReportOverRecursed
 (gdb) r
@@ -90,7 +90,7 @@ Breakpoint 1, js::ReportOverRecursed (maybecx=0xfdca70) at /home/nicolas/mozilla
 ```
 
 Note, you can do the exact same exercise above using `lldb` (necessary
-on macOS after Apple removed gdb) by running `lldb -f js78` then
+on macOS after Apple removed gdb) by running `lldb -f js91` then
 following the remaining steps.
 
 We also have a gdb unwinder.
