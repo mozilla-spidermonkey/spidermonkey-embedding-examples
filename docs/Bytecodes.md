@@ -1,7 +1,7 @@
 # Bytecode Listing #
 
 This document is automatically generated from
-[`Opcodes.h`](https://searchfox.org/mozilla-esr78/source/js/src/vm/Opcodes.h) by
+[`Opcodes.h`](https://searchfox.org/mozilla-esr91/source/js/src/vm/Opcodes.h) by
 [`make_opcode_doc.py`](../tools/make_opcode_doc.py).
 
 ## Background ##
@@ -511,7 +511,7 @@ exponent is negative.
 
 
 
-##### `ToId`
+##### `ToPropertyKey`
 
 
 **Stack:** `propertyNameValue` &rArr; `propertyKey`
@@ -534,6 +534,7 @@ throw.
 [1]: https://tc39.es/ecma262/#sec-topropertykey
 
 
+**Format:** JOF_IC
 
 ##### `ToNumeric`, `ToString`
 
@@ -634,7 +635,7 @@ Create and push a new object with no properties.
 
 **Format:** JOF_IC
 
-##### `NewObject`, `NewObjectWithGroup`
+##### `NewObject`
 
 **Operands:** `(uint32_t baseobjIndex)`
 
@@ -646,11 +647,6 @@ The new object has the shape of the template object
 `script->getObject(baseobjIndex)`. Subsequent `InitProp` instructions
 must fill in all slots of the new object before it is used in any other
 way.
-
-For `JSOp::NewObject`, the new object has a group based on the allocation
-site (or a new group if the template's group is a singleton). For
-`JSOp::NewObjectWithGroup`, the new object has the same group as the
-template object.
 
 
 **Format:** JOF_OBJECT, JOF_IC
@@ -672,8 +668,9 @@ The spec requires that an *ObjectLiteral* or *ArrayLiteral* creates a
 new object every time it's evaluated, so this instruction must not be
 used anywhere it might be executed more than once.
 
-There's a shell-only option, `newGlobal({cloneSingletons: true})`, that
-makes this instruction do a deep copy of the object. A few tests use it.
+This may only be used in non-function run-once scripts. Care also must
+be taken to not emit in loops or other constructs where it could run
+more than once.
 
 
 **Format:** JOF_OBJECT
@@ -750,7 +747,7 @@ false.
 
 **Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
 
-##### `InitElem`, `InitHiddenElem`
+##### `InitElem`, `InitHiddenElem`, `InitLockedElem`
 
 
 **Stack:** `obj, id, val` &rArr; `obj`
@@ -765,6 +762,8 @@ object literals like `{0: val}` and `{[id]: val}`, and methods like
 
 `JSOp::InitHiddenElem` is the same but defines a non-enumerable property,
 for class methods.
+`JSOp::InitLockedElem` is the same but defines a non-enumerable, non-writable, non-configurable property,
+for private class methods.
 
    [1]: https://tc39.es/ecma262/#sec-createdatapropertyorthrow
 
@@ -844,7 +843,7 @@ property, for setters in classes.
 
 
 
-##### `GetProp`, `CallProp`
+##### `GetProp`
 
 **Operands:** `(uint32_t nameIndex)`
 
@@ -853,48 +852,28 @@ property, for setters in classes.
 Get the value of the property `obj.name`. This can call getters and
 proxy traps.
 
-`JSOp::CallProp` is exactly like `JSOp::GetProp` but hints to the VM that we're
-getting a method in order to call it.
-
 Implements: [GetV][1], [GetValue][2] step 5.
 
 [1]: https://tc39.es/ecma262/#sec-getv
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_PROP, JOF_IC
 
-##### `GetElem`, `CallElem`
+##### `GetElem`
 
 
 **Stack:** `obj, key` &rArr; `obj[key]`
 
 Get the value of the property `obj[key]`.
 
-`JSOp::CallElem` is exactly like `JSOp::GetElem` but hints to the VM that
-we're getting a method in order to call it.
-
 Implements: [GetV][1], [GetValue][2] step 5.
 
 [1]: https://tc39.es/ecma262/#sec-getv
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ELEM, JOF_TYPESET, JOF_IC
-
-##### `Length`
-
-**Operands:** `(uint32_t nameIndex)`
-
-**Stack:** `obj` &rArr; `obj.length`
-
-Push the value of `obj.length`.
-
-`nameIndex` must be the index of the atom `"length"`. This then behaves
-exactly like `JSOp::GetProp`.
-
-
-**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+**Format:** JOF_ELEM, JOF_IC
 
 ##### `SetProp`
 
@@ -1030,6 +1009,25 @@ js/src/builtin/Object.js).
 
 **Format:** JOF_IC
 
+##### `CheckPrivateField`
+
+**Operands:** `(ThrowCondition throwCondition, ThrowMsgKind msgKind)`
+
+**Stack:** `obj, key` &rArr; `obj, key, (obj.hasOwnProperty(id))`
+
+Push a bool representing the presence of private field id on obj.
+May throw, depending on the ThrowCondition.
+
+Two arguments:
+  - throwCondition: One of the ThrowConditions defined in
+    ThrowMsgKind.h. Determines why (or if) this op will throw.
+  - msgKind: One of the ThrowMsgKinds defined in ThrowMsgKind.h, which
+    maps to one of the messages in js.msg. Note: It's not possible to
+    pass arguments to the message at the moment.
+
+
+**Format:** JOF_TWO_UINT8, JOF_CHECKSTRICT, JOF_IC
+
 #### Super ####
 
 
@@ -1070,7 +1068,7 @@ method.
 [2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_PROP, JOF_IC
 
 ##### `GetElemSuper`
 
@@ -1089,7 +1087,7 @@ method); [`Reflect.get(obj, key, receiver)`][3].
 [3]: https://tc39.es/ecma262/#sec-reflect.get
 
 
-**Format:** JOF_ELEM, JOF_TYPESET, JOF_IC
+**Format:** JOF_ELEM, JOF_IC
 
 ##### `SetPropSuper`
 
@@ -1219,16 +1217,6 @@ Test whether the value on top of the stack is
 
 
 
-##### `IterNext`
-
-
-**Stack:** `val` &rArr; `val`
-
-No-op instruction to hint to IonBuilder that the value on top of the
-stack is the string key in a for-in loop.
-
-
-
 ##### `EndIter`
 
 
@@ -1342,7 +1330,7 @@ preallocating enough memory to hold that many elements.
 
 Initialize an array element `array[index]` with value `val`.
 
-`val` may be `MagicValue(JS_ELEMENTS_HOLE)`. If it is, this does nothing.
+`val` may be `MagicValue(JS_ELEMENTS_HOLE)` pushed by `JSOp::Hole`.
 
 This never calls setters or proxy traps.
 
@@ -1355,7 +1343,7 @@ common case where *nextIndex* is known.
 [1]: https://tc39.es/ecma262/#sec-runtime-semantics-arrayaccumulation
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+**Format:** JOF_ELEM, JOF_PROPINIT
 
 ##### `InitElemInc`
 
@@ -1364,9 +1352,9 @@ common case where *nextIndex* is known.
 
 Initialize an array element `array[index++]` with value `val`.
 
-`val` may be `MagicValue(JS_ELEMENTS_HOLE)`. If it is, no element is
-defined, but the array length and the stack value `index` are still
-incremented.
+`val` may be `MagicValue(JS_ELEMENTS_HOLE)` pushed by `JSOp::Hole`. If it
+is, no element is defined, but the array length and the stack value
+`index` are still incremented.
 
 This never calls setters or proxy traps.
 
@@ -1402,25 +1390,6 @@ This magic value must be used only by `JSOp::InitElemArray` or
 
 
 
-##### `NewArrayCopyOnWrite`
-
-**Operands:** `(uint32_t objectIndex)`
-
-**Stack:** &rArr; `array`
-
-Create and push a new array that shares the elements of a template
-object.
-
-`script->getObject(objectIndex)` must be a copy-on-write array whose
-elements are all primitive values.
-
-This is an optimization. This single instruction implements an entire
-array literal, saving run time, code, and memory compared to
-`JSOp::NewArray` and a series of `JSOp::InitElem` instructions.
-
-
-**Format:** JOF_OBJECT
-
 #### RegExp literals ####
 
 
@@ -1439,6 +1408,23 @@ Implements: [Evaluation for *RegularExpressionLiteral*][1].
 
 
 
+#### Built-in objects ####
+
+
+
+##### `BuiltinObject`
+
+**Operands:** `(uint8_t kind)`
+
+**Stack:** &rArr; `%BuiltinObject%`
+
+Pushes the current global's %BuiltinObject%.
+
+`kind` must be a valid `BuiltinObjectKind` (and must not be
+`BuiltinObjectKind::None`).
+
+
+
 ### Functions ###
 
 #### Creating functions ####
@@ -1451,11 +1437,9 @@ Implements: [Evaluation for *RegularExpressionLiteral*][1].
 
 **Stack:** &rArr; `fn`
 
-Push a function object.
+Push a new function object.
 
-This clones the function unless it's a singleton; see
-`CanReuseFunctionForClone`. The new function inherits the current
-environment chain.
+The new function inherits the current environment chain.
 
 Used to create most JS functions. Notable exceptions are arrow functions
 and derived or default class constructors.
@@ -1559,63 +1543,6 @@ Implements: [ClassDefinitionEvaluation][1] steps 6.e.ii, 6.g.iii, and
 
 **Format:** JOF_OBJECT
 
-##### `ClassConstructor`
-
-**Operands:** `(uint32_t nameIndex, uint32_t sourceStart, uint32_t sourceEnd)`
-
-**Stack:** &rArr; `constructor`
-
-Create and push a default constructor for a base class.
-
-A default constructor behaves like `constructor() {}`.
-
-Implements: [ClassDefinitionEvaluation for *ClassTail*][1], steps
-10.b. and 12-17.
-
-The `sourceStart`/`sourceEnd` offsets are the start/end offsets of the
-class definition in the source buffer, used for `toString()`. They must
-be valid offsets into the source buffer, measured in code units, such
-that `scriptSource->substring(cx, start, end)` is valid.
-
-[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
-
-
-**Format:** JOF_CLASS_CTOR
-
-##### `DerivedConstructor`
-
-**Operands:** `(uint32_t nameIndex, uint32_t sourceStart, uint32_t sourceEnd)`
-
-**Stack:** `proto` &rArr; `constructor`
-
-Create and push a default constructor for a derived class.
-
-A default derived-class constructor behaves like
-`constructor(...args) { super(...args); }`.
-
-Implements: [ClassDefinitionEvaluation for *ClassTail*][1], steps
-10.a. and 12-17.
-
-`sourceStart` and `sourceEnd` follow the same rules as for
-`JSOp::ClassConstructor`.
-
-[1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
-
-
-**Format:** JOF_CLASS_CTOR
-
-##### `FunctionProto`
-
-
-**Stack:** &rArr; `%FunctionPrototype%`
-
-Pushes the current global's FunctionPrototype.
-
-`kind` must be in range for `JSProtoKey` (and must not be
-`JSProto_LIMIT`).
-
-
-
 #### Calls ####
 
 
@@ -1649,7 +1576,7 @@ Implements: [EvaluateCall][1] steps 4, 5, and 7.
 [1]: https://tc39.es/ecma262/#sec-evaluatecall
 
 
-**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_IC
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_IC
 
 ##### `SpreadCall`
 
@@ -1666,7 +1593,7 @@ This can be ensured by creating the array with `JSOp::NewArray` and
 populating it using `JSOp::InitElemArray`.
 
 
-**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_IC
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_IC
 
 ##### `OptimizeSpreadCall`
 
@@ -1684,6 +1611,7 @@ f(...arr)`, a strong hint that it's a packed Array whose prototype is
 See `js::OptimizeSpreadCall`.
 
 
+**Format:** JOF_IC
 
 ##### `Eval`
 
@@ -1714,7 +1642,7 @@ syntactic critera for direct eval in step 6 are all met.
 [1]: https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
 
 
-**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_CHECKSLOPPY, JOF_IC
 
 ##### `SpreadEval`
 
@@ -1726,7 +1654,7 @@ Spread-call variant of `JSOp::Eval`.
 See `JSOp::SpreadCall` for restrictions on `args`.
 
 
-**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_CHECKSLOPPY, JOF_IC
 
 ##### `StrictEval`
 
@@ -1737,7 +1665,7 @@ See `JSOp::SpreadCall` for restrictions on `args`.
 Like `JSOp::Eval`, but for strict mode code.
 
 
-**Format:** JOF_ARGC, JOF_INVOKE, JOF_TYPESET, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_CHECKSTRICT, JOF_IC
 
 ##### `StrictSpreadEval`
 
@@ -1749,7 +1677,7 @@ Spread-call variant of `JSOp::StrictEval`.
 See `JSOp::SpreadCall` for restrictions on `args`.
 
 
-**Format:** JOF_INVOKE, JOF_SPREAD, JOF_TYPESET, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_INVOKE, JOF_SPREAD, JOF_CHECKSTRICT, JOF_IC
 
 ##### `ImplicitThis`
 
@@ -1854,7 +1782,7 @@ Implements: [EvaluateConstruct][1] steps 7 and 8.
 [1]: https://tc39.es/ecma262/#sec-evaluatenew
 
 
-**Format:** JOF_ARGC, JOF_INVOKE, JOF_CONSTRUCT, JOF_TYPESET, JOF_IC
+**Format:** JOF_ARGC, JOF_INVOKE, JOF_CONSTRUCT, JOF_IC
 
 ##### `SpreadNew`, `SpreadSuperCall`
 
@@ -1873,7 +1801,7 @@ See `JSOp::SpreadCall` for restrictions on `args`.
 used for *SuperCall* expressions.
 
 
-**Format:** JOF_INVOKE, JOF_CONSTRUCT, JOF_SPREAD, JOF_TYPESET, JOF_IC
+**Format:** JOF_INVOKE, JOF_CONSTRUCT, JOF_SPREAD, JOF_IC
 
 ##### `SuperFun`
 
@@ -2140,20 +2068,35 @@ Implements: [Await][1], steps 10-12.
 
 **Format:** JOF_RESUMEINDEX
 
-##### `TrySkipAwait`
+##### `CanSkipAwait`
 
 
-**Stack:** `value` &rArr; `value_or_resolved, can_skip`
+**Stack:** `value` &rArr; `value, can_skip`
 
-Decide whether awaiting 'value' can be skipped.
+Test if the re-entry to the microtask loop may be skipped.
 
 This is part of an optimization for `await` expressions. Programs very
 often await values that aren't promises, or promises that are already
 resolved. We can then sometimes skip suspending the current frame and
 returning to the microtask loop. If the circumstances permit the
-optimization, `TrySkipAwait` replaces `value` with the result of the
-`await` expression (unwrapping the resolved promise, if any) and pushes
-`true`. Otherwise, it leaves `value` unchanged and pushes 'false'.
+optimization, `CanSkipAwait` pushes true if the optimization is allowed,
+and false otherwise.
+
+
+
+##### `MaybeExtractAwaitValue`
+
+
+**Stack:** `value, can_skip` &rArr; `value_or_resolved, can_skip`
+
+Potentially extract an awaited value, if the await is skippable
+
+If re-entering the microtask loop is skippable (as checked by CanSkipAwait)
+if can_skip is true,  `MaybeExtractAwaitValue` replaces `value` with the result of the
+`await` expression (unwrapping the resolved promise, if any). Otherwise, value remains
+as is.
+
+In both cases, can_skip remains the same.
 
 
 
@@ -2259,7 +2202,7 @@ See "Jump instructions" above for details.
 
 **Format:** JOF_JUMP
 
-##### `IfEq`
+##### `JumpIfFalse`
 
 **Operands:** `(int32_t forwardOffset)`
 
@@ -2271,7 +2214,7 @@ instruction.
 
 **Format:** JOF_JUMP, JOF_IC
 
-##### `IfNe`
+##### `JumpIfTrue`
 
 **Operands:** `(int32_t offset)`
 
@@ -2334,8 +2277,8 @@ current instruction.
 
 **Stack:** `val, cond` &rArr; `val (if !cond)`
 
-Like `JSOp::IfNe` ("jump if true"), but if the branch is taken,
-pop and discard an additional stack value.
+Like `JSOp::JumpIfTrue`, but if the branch is taken, pop and discard an
+additional stack value.
 
 This is used to implement `switch` statements when the
 `JSOp::TableSwitch` optimization is not possible. The switch statement
@@ -2361,8 +2304,8 @@ compiles to this bytecode:
 
 This opcode is weird: it's the only one whose ndefs varies depending on
 which way a conditional branch goes. We could implement switch
-statements using `JSOp::IfNe` and `JSOp::Pop`, but that would also be
-awkward--putting the `JSOp::Pop` inside the `switch` body would
+statements using `JSOp::JumpIfTrue` and `JSOp::Pop`, but that would also
+be awkward--putting the `JSOp::Pop` inside the `switch` body would
 complicate fallthrough.
 
 
@@ -2524,9 +2467,9 @@ Sometimes we know at emit time that an operation always throws. For
 example, `delete super.prop;` is allowed in methods, but always throws a
 ReferenceError.
 
-`msgNumber` must be one of the error codes listed in js/src/js.msg; it
-determines the `.message` and [[Prototype]] of the new Error object. The
-number of arguments in the error message must be 0.
+`msgNumber` determines the `.message` and [[Prototype]] of the new Error
+object.  It must be an error number in js/public/friend/ErrorNumbers.msg.
+The number of arguments in the error message must be 0.
 
 
 
@@ -2542,21 +2485,15 @@ Throws a runtime TypeError for invalid assignment to a `const` binding.
 
 ##### `Try`
 
-**Operands:** `(int32_t jumpAtEndOffset)`
 
 
 No-op instruction that marks the top of the bytecode for a
 *TryStatement*.
 
-The `jumpAtEndOffset` operand must be the offset (relative to the
-current op) of the `JSOp::Goto` at the end of the try-block body. This
-is used by bytecode analysis and JIT compilation.
-
 Location information for catch/finally blocks is stored in a side table,
 `script->trynotes()`.
 
 
-**Format:** JOF_CODE_OFFSET
 
 ##### `TryDestructuring`
 
@@ -2733,8 +2670,8 @@ this is how `const` bindings are initialized.)
 
 Initialize a global lexical binding.
 
-The binding must already have been created by `DefLet` or `DefConst` and
-must be uninitialized.
+The binding must already have been created by
+`GlobalOrEvalDeclInstantiation` and must be uninitialized.
 
 Like `JSOp::InitLexical` but for global lexicals. Unlike `InitLexical`
 this can't be used to mark a binding as uninitialized.
@@ -2871,7 +2808,7 @@ cases. Optimized instructions follow.
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_NAME, JOF_IC
 
 ##### `GetGName`
 
@@ -2897,7 +2834,7 @@ found (unless the next instruction is `JSOp::Typeof`) or if the binding
 is an uninitialized lexical.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_GNAME, JOF_IC
+**Format:** JOF_ATOM, JOF_NAME, JOF_GNAME, JOF_IC
 
 ##### `GetArg`
 
@@ -2950,7 +2887,19 @@ to non-strict `eval` or `with`) that might shadow the aliased binding.
 [1]: https://searchfox.org/mozilla-central/search?q=symbol:T_js%3A%3AEnvironmentCoordinate
 
 
-**Format:** JOF_ENVCOORD, JOF_NAME, JOF_TYPESET, JOF_IC
+**Format:** JOF_ENVCOORD, JOF_NAME
+
+##### `GetAliasedDebugVar`
+
+**Operands:** `(uint8_t hops, uint24_t slot)`
+
+**Stack:** &rArr; `aliasedVar`
+
+Push the value of an aliased binding, which may have to bypass a DebugEnvironmentProxy
+on the environment chain.
+
+
+**Format:** JOF_DEBUGCOORD, JOF_NAME
 
 ##### `GetImport`
 
@@ -2961,7 +2910,7 @@ to non-strict `eval` or `with`) that might shadow the aliased binding.
 Get the value of a module import by name and pushes it onto the stack.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_NAME
 
 ##### `GetBoundName`
 
@@ -2988,7 +2937,7 @@ Implements: [GetValue][1] steps 4 and 6.
 [1]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_NAME, JOF_IC
 
 ##### `GetIntrinsic`
 
@@ -3003,7 +2952,7 @@ Non-standard. Intrinsics are slots in the intrinsics holder object (see
 bindings in self-hosting code.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_TYPESET, JOF_IC
+**Format:** JOF_ATOM, JOF_NAME, JOF_IC
 
 ##### `Callee`
 
@@ -3181,7 +3130,7 @@ have many global `var`s, but it has many `function`s.)
 Push a lexical environment onto the environment chain.
 
 The `LexicalScope` indicated by `lexicalScopeIndex` determines the shape
-of the new `LexicalEnvironmentObject`. All bindings in the new
+of the new `BlockLexicalEnvironmentObject`. All bindings in the new
 environment are marked as uninitialized.
 
 Implements: [Evaluation of *Block*][1], steps 1-4.
@@ -3189,7 +3138,8 @@ Implements: [Evaluation of *Block*][1], steps 1-4.
 #### Fine print for environment chain instructions
 
 The following rules for `JSOp::{Push,Pop}LexicalEnv` also apply to
-`JSOp::PushVarEnv` and `JSOp::{Enter,Leave}With`.
+`JSOp::PushClassBodyEnv`, `JSOp::PushVarEnv`, and
+`JSOp::{Enter,Leave}With`.
 
 Each `JSOp::PopLexicalEnv` instruction matches a particular
 `JSOp::PushLexicalEnv` instruction in the same script and must have the
@@ -3221,7 +3171,7 @@ after a `JSOp::PopLexicalEnv`, then those must be correctly noted as
 
 
 
-Pop a lexical environment from the environment chain.
+Pop a lexical or class-body environment from the environment chain.
 
 See `JSOp::PushLexicalEnv` for the fine print.
 
@@ -3239,9 +3189,9 @@ the runtime environment objects for that scope are optimized away. No
 debugger still needs to be notified when control exits a scope; that's
 what this instruction does.
 
-The last instruction in a lexical scope, as indicated by scope notes,
-must be either this instruction (if the scope is optimized) or
-`JSOp::PopLexicalEnv` (if not).
+The last instruction in a lexical or class-body scope, as indicated by
+scope notes, must be either this instruction (if the scope is optimized)
+or `JSOp::PopLexicalEnv` (if not).
 
 
 
@@ -3249,12 +3199,12 @@ must be either this instruction (if the scope is optimized) or
 
 
 
-Recreate the current block on the environment chain with a fresh block
+Replace the current block on the environment chain with a fresh block
 with uninitialized bindings. This implements the behavior of inducing a
 fresh lexical environment for every iteration of a for-in/of loop whose
-loop-head has a (captured) lexical declaration.
+loop-head declares lexical variables that may be captured.
 
-The current environment must be a LexicalEnvironmentObject.
+The current environment must be a BlockLexicalEnvironmentObject.
 
 
 
@@ -3262,15 +3212,27 @@ The current environment must be a LexicalEnvironmentObject.
 
 
 
-Replace the current block on the environment chain with a fresh block
-that copies all the bindings in the block. This implements the behavior
-of inducing a fresh lexical environment for every iteration of a
-`for(let ...; ...; ...)` loop, if any declarations induced by such a
-loop are captured within the loop.
-
-The current environment must be a LexicalEnvironmentObject.
+Like `JSOp::RecreateLexicalEnv`, but the values of all the bindings are
+copied from the old block to the new one. This is used for C-style
+`for(let ...; ...; ...)` loops.
 
 
+
+##### `PushClassBodyEnv`
+
+**Operands:** `(uint32_t lexicalScopeIndex)`
+
+
+Push a ClassBody environment onto the environment chain.
+
+Like `JSOp::PushLexicalEnv`, but pushes a `ClassBodyEnvironmentObject`
+rather than a `BlockLexicalEnvironmentObject`.  `JSOp::PopLexicalEnv` is
+used to pop class-body environments as well as lexical environments.
+
+See `JSOp::PushLexicalEnv` for the fine print.
+
+
+**Format:** JOF_SCOPE
 
 ##### `PushVarEnv`
 
@@ -3280,9 +3242,9 @@ The current environment must be a LexicalEnvironmentObject.
 Push a var environment onto the environment chain.
 
 Like `JSOp::PushLexicalEnv`, but pushes a `VarEnvironmentObject` rather
-than a `LexicalEnvironmentObject`. The difference is that non-strict
-direct `eval` can add bindings to a var environment; see `VarScope` in
-Scope.h.
+than a `BlockLexicalEnvironmentObject`. The difference is that
+non-strict direct `eval` can add bindings to a var environment; see
+`VarScope` in Scope.h.
 
 See `JSOp::PushLexicalEnv` for the fine print.
 
@@ -3370,89 +3332,28 @@ can't be optimized.
 
 
 
-##### `DefVar`
+##### `GlobalOrEvalDeclInstantiation`
 
-**Operands:** `(uint32_t nameIndex)`
-
-
-Create a new binding on the current VariableEnvironment (the environment
-on the environment chain designated to receive new variables).
-
-`JSOp::Def{Var,Let,Const,Fun}` instructions must appear in the script
-before anything else that might add bindings to the environment, and
-only once per binding. There must be a correct entry for the new binding
-in `script->bodyScope()`. (All this ensures that at run time, there is
-no existing conflicting binding. This is checked by the
-`JSOp::CheckGlobalOrEvalDecl` bytecode instruction that must appear
-before `JSOp::Def{Var,Let,Const,Fun}`.)
-
-Throw a SyntaxError if the current VariableEnvironment is the global
-environment and a binding with the same name exists on the global
-lexical environment.
-
-This is used for global scripts and also in some cases for function
-scripts where use of dynamic scoping inhibits optimization.
+**Operands:** `(uint32_t lastFun)`
 
 
-**Format:** JOF_ATOM
+Check for conflicting bindings and then initialize them in global or
+sloppy eval scripts. This is required for global scripts with any
+top-level bindings, or any sloppy-eval scripts with any non-lexical
+top-level bindings.
 
-##### `DefFun`
+Implements: [GlobalDeclarationInstantiation][1] and
+            [EvalDeclarationInstantiation][2] (except step 12).
 
-
-**Stack:** `fun` &rArr;
-
-Create a new binding for the given function on the current scope.
-
-`fun` must be a function object with an explicit name. The new
-variable's name is `fun->explicitName()`, and its value is `fun`. In
-global scope, this creates a new property on the global object.
-
-Implements: The body of the loop in [GlobalDeclarationInstantiation][1]
-step 17 ("For each Parse Node *f* in *functionsToInitialize*...") and
-the corresponding loop in [EvalDeclarationInstantiation][2].
+The `lastFun` argument is a GCThingIndex of the last hoisted top-level
+function that is part of top-level script initialization. The gcthings
+from index `0` thru `lastFun` contain only scopes and hoisted functions.
 
 [1]: https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
 [2]: https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 
 
-
-##### `DefLet`
-
-**Operands:** `(uint32_t nameIndex)`
-
-
-Create a new uninitialized mutable binding in the global lexical
-environment. Throw a SyntaxError if a binding with the same name already
-exists on that environment, or if a var binding with the same name
-exists on the global.
-
-
-**Format:** JOF_ATOM
-
-##### `DefConst`
-
-**Operands:** `(uint32_t nameIndex)`
-
-
-Like `DefLet`, but create an uninitialized constant binding.
-
-
-**Format:** JOF_ATOM
-
-##### `CheckGlobalOrEvalDecl`
-
-
-
-Check for conflicting bindings before `JSOp::Def{Var,Let,Const,Fun}` in
-global or sloppy eval scripts.
-
-Implements: [GlobalDeclarationInstantiation][1] steps 5, 6, 10 and 12,
-and [EvalDeclarationInstantiation][2] steps 5 and 8.
-
-[1]: https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
-[2]: https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
-
-
+**Format:** JOF_GCTHING
 
 ##### `DelName`
 
@@ -3497,30 +3398,6 @@ all.
 The current script must be a function script. This instruction must
 execute at most once per function activation.
 
-#### Optimized arguments
-
-If `script->needsArgsObj()` is false, no ArgumentsObject is created.
-Instead, `MagicValue(JS_OPTIMIZED_ARGUMENTS)` is pushed.
-
-This optimization imposes no restrictions on bytecode. Rather,
-`js::jit::AnalyzeArgumentsUsage` examines the bytecode and enables the
-optimization only if all uses of `arguments` are optimizable.  Each
-execution engine must know what the analysis considers optimizable and
-cope with the magic value when it is used in those ways.
-
-Example 1: `arguments[0]` is supported; therefore the interpreter's
-implementation of `JSOp::GetElem` checks for optimized arguments (see
-`GetElemOptimizedArguments`).
-
-Example 2: `f.apply(this, arguments)` is supported; therefore our
-implementation of `Function.prototype.apply` checks for optimized
-arguments (`see js::fun_apply`), and all `JSOp::FunApply` implementations
-must check for cases where `f.apply` turns out to be any other function
-(see `GuardFunApplyArgumentsOptimization`).
-
-It's not documented anywhere exactly which opcodes support
-`JS_OPTIMIZED_ARGUMENTS`; see the source of `AnalyzeArgumentsUsage`.
-
 
 
 ##### `Rest`
@@ -3534,7 +3411,7 @@ This must appear only in a script for a function that has a rest
 parameter.
 
 
-**Format:** JOF_TYPESET, JOF_IC
+**Format:** JOF_IC
 
 ##### `FunctionThis`
 
@@ -3703,33 +3580,6 @@ the C++ interpreter.
 Examine the top stack value, asserting that it's either a self-hosted
 function or a self-hosted intrinsic. This does nothing in a non-debug
 build.
-
-
-
-##### `InstrumentationActive`
-
-
-**Stack:** &rArr; `val`
-
-Push a boolean indicating if instrumentation is active.
-
-
-
-##### `InstrumentationCallback`
-
-
-**Stack:** &rArr; `val`
-
-Push the instrumentation callback for the current realm.
-
-
-
-##### `InstrumentationScriptId`
-
-
-**Stack:** &rArr; `val`
-
-Push the current script's instrumentation ID.
 
 
 
