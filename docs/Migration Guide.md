@@ -13,9 +13,14 @@ of SpiderMonkey to the next ESR version.
 - JS_{Get,Set}Private moved to JS::{Get,Set}Private in js/Object.h (Bug 1663365)
 - JS_GetClass moved to JS::GetClass in js/Object.h (Bug 1663365)
 - JS_{Get,Set}ReservedSlot moved to JS::{Get,Set}ReservedSlot in js/Object.h (Bug 1663365)
-- JS_IsUint8Array moved into js/experimental/TypedData.h (Bug 1656411)
+- Various ArrayBuffer and typed-array methods are moved into js/experimental/TypedData.h (Bug 1656411)
+- js::GetUint8ArrayLengthAndData (and friends) now use size_t for length instead of uint32_t (Bug 1674777)
 - js::GetErrorMessage moved to js/friend/ErrorMessages.h (Bug 1654927)
 - JS::PrintError no longer takes `cx` argument (Bug 1711878)
+- JS_StringHasLatin1Chars moved to JS::StringHasLatin1Chars in js/String.h (Bug 1663365)
+- Dump{Value,String,..} moved to js/friend/DumpFunctions.h (Bug 1656411)
+- JS_GetPropertyDescriptor and friends now use Maybe in their signatures (Bug 1706404)
+- JSID_IS_STRING and friends are replaced with methods on JS::PropertyKey (Bug 1633145)
 
 ## ESR 68 to ESR 78 ##
 
