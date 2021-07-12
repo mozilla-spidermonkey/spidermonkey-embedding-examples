@@ -218,7 +218,7 @@ static bool RunREPL(JSContext* cx) {
   JSAutoRealm ar(cx, global);
 
   JS::SetWarningReporter(cx, [](JSContext* cx, JSErrorReport* report) {
-    JS::PrintError(cx, stderr, report, true);
+    JS::PrintError(stderr, report, true);
   });
 
   ReplGlobal::loop(cx, global);

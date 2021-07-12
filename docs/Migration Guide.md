@@ -3,7 +3,7 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
-## ESR 78 to ESR 90 ##
+## ESR 78 to ESR 91 ##
 
 - JS::ExceptionStack now requires including js/Exception.h (Bug 1626100)
 - JS_New replaced with JS::Construct. (Bug 1491055)
@@ -15,6 +15,7 @@ of SpiderMonkey to the next ESR version.
 - JS_{Get,Set}ReservedSlot moved to JS::{Get,Set}ReservedSlot in js/Object.h (Bug 1663365)
 - JS_IsUint8Array moved into js/experimental/TypedData.h (Bug 1656411)
 - js::GetErrorMessage moved to js/friend/ErrorMessages.h (Bug 1654927)
+- JS::PrintError no longer takes `cx` argument (Bug 1711878)
 
 ## ESR 68 to ESR 78 ##
 
