@@ -55,10 +55,7 @@ class ReplGlobal {
     return false;
   }
 
-  /* The class of the global object. */
-  static constexpr JSClass klass = {"ReplGlobal",
-                                    JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
-                                    &JS::DefaultGlobalClassOps};
+  static const JSClass klass;
 
   static constexpr JSFunctionSpec functions[] = {
       JS_FN("quit", &ReplGlobal::quit, 0, 0), JS_FS_END};
@@ -67,8 +64,12 @@ class ReplGlobal {
   static JSObject* create(JSContext* cx);
   static void loop(JSContext* cx, JS::HandleObject global);
 };
-constexpr JSClass ReplGlobal::klass;
 constexpr JSFunctionSpec ReplGlobal::functions[];
+
+/* The class of the global object. */
+const JSClass ReplGlobal::klass = {"ReplGlobal",
+                                   JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
+                                   &JS::DefaultGlobalClassOps};
 
 std::string FormatString(JSContext* cx, JS::HandleString string) {
   std::string buf = "\"";
