@@ -5,22 +5,216 @@ of SpiderMonkey to the next ESR version.
 
 ## ESR 78 to ESR 91 ##
 
-- JS::ExceptionStack now requires including js/Exception.h (Bug 1626100)
-- JS_New replaced with JS::Construct. (Bug 1491055)
-- SetModuleResolveHook changed signature. (Bug 1668330)
-- ModuleEvaluate gained a new result out-parameter to represent the promise in Top-Level-Await (Bug 1519100)
-- Insead of a specifier string, ResolveHooks recieve a ModuleRequest, which contains the specifier (Bug 1668330)
-- JS_{Get,Set}Private moved to JS::{Get,Set}Private in js/Object.h (Bug 1663365)
-- JS_GetClass moved to JS::GetClass in js/Object.h (Bug 1663365)
-- JS_{Get,Set}ReservedSlot moved to JS::{Get,Set}ReservedSlot in js/Object.h (Bug 1663365)
-- Various ArrayBuffer and typed-array methods are moved into js/experimental/TypedData.h (Bug 1656411)
-- js::GetUint8ArrayLengthAndData (and friends) now use size_t for length instead of uint32_t (Bug 1674777)
-- js::GetErrorMessage moved to js/friend/ErrorMessages.h (Bug 1654927)
-- JS::PrintError no longer takes `cx` argument (Bug 1711878)
-- JS_StringHasLatin1Chars moved to JS::StringHasLatin1Chars in js/String.h (Bug 1663365)
-- Dump{Value,String,..} moved to js/friend/DumpFunctions.h (Bug 1656411)
-- JS_GetPropertyDescriptor and friends now use Maybe in their signatures (Bug 1706404)
-- JSID_IS_STRING and friends are replaced with methods on JS::PropertyKey (Bug 1633145)
+### Object construction ###
+
+In ESR 78 there were two APIs that construct objects as if calling `new
+Constructor(...args)`: `JS_New()` and `JS::Construct()`.
+`JS_New()` was redundant and has been removed.
+(Bug [1491055](https://bugzilla.mozilla.org/show_bug.cgi?id=1491055))
+
+**Recommendation:** Replace all uses of `JS_New()` with the
+four-argument version of `JS::Construct()` before doing the migration.
+Note that `JS::Construct()` takes the constructor as a `JS::HandleValue`
+instead of `JS::HandleObject`, and returns a boolean indicating success
+or error.
+
+```c++
+// old
+JS::RootedObject myConstructor(cx, &myConstructorValue.toObject());
+JS::RootedObject myObject(cx, JS_New(cx, myConstructor, args));
+if (!myObject) return false;
+
+// new
+JS::RootedObject myObject(cx);
+if (!JS::Construct(cx, myConstructorValue, args, &myObject)) return false;
+```
+
+### Property keys ###
+
+The `jsid` type was already an alias of `JS::PropertyKey`.
+Some of the old `JSID_IS_...` and `JSID_TO_...` macro-like APIs still
+exist in ESR 91, although there now exist methods of `JS::PropertyKey`
+which do the same things.
+Others have been removed.
+(Bug [1633145](https://bugzilla.mozilla.org/show_bug.cgi?id=1633145))
+
+**Recommendation:** Replace the following before the migration:
+- `JSID_IS_STRING(id)` → `id.isString()`
+- `JSID_TO_STRING(id)` → `id.toString()`
+- `JSID_IS_INT(id)` → `id.isInt()`
+- `JSID_TO_INT(id)` → `id.toInt()`
+- `JSID_IS_SYMBOL(id)` → `id.isSymbol()`
+- `JSID_TO_SYMBOL(id)` → `id.toSymbol()`
+- `JSID_IS_GCTHING(id)` → `id.isGCThing()`
+- `JSID_TO_GCTHING(id)` → `id.toGCCellPtr()`
+- `INTERNED_STRING_TO_JSID(cx, str)` → `JS::PropertyKey::fromPinnedString(str)`
+- `NON_INTEGER_ATOM_TO_JSID(str)` → `JS::PropertyKey::fromNonIntAtom(str)`
+
+After the migration, additionally replace `JSID_IS_VOID(id)` → `id.isVoid()`.
+
+`JSID_IS_ATOM()` and `JSID_TO_ATOM()` can be replaced by `isAtom()` and
+`toAtom()` respectively, but consider if it might be better to rewrite
+those in terms of `isString()` and `toString()`.
+
+### Module resolve hooks ###
+
+Module resolve hooks have changed signature.
+Insead of a specifier string, resolve hooks recieve a module request
+object, which contains the specifier and in the future potentially other
+information as well.
+(Bug [1668330](https://bugzilla.mozilla.org/show_bug.cgi?id=1668330))
+
+**Recommendation:** Unless you are using `JS::SetModuleResolveHook()`,
+then you don't have to do anything.
+If you are, then adapt the signature of your module resolve hook to take
+`JS::HandleObject` as its last parameter rather than `JS::HandleString`.
+To get the specifier, if you were using it, use
+`JS::GetModuleRequestSpecifier(cx, moduleRequestObject)`.
+
+### Top-level await changes ###
+
+There have been some changes to the module evaluation and dynamic import
+APIs to accommodate top-level await.
+(Bug [1519100](https://bugzilla.mozilla.org/show_bug.cgi?id=1519100))
+
+**Recommendation:** Unless you are using modules in your codebase, no
+changes are necessary.
+Additionally, the changes are minimal, limited to a few API signatures,
+unless you decide to enable top-level await in your codebase.
+
+First, `JS::ModuleEvaluate()` has gained a `JS::MutableHandleValue` out
+parameter, which must be passed in, but can otherwise be ignored.
+This out parameter is for the Promise that would be returned from a
+top-level await operation.
+
+Then, replace any calls to `JS::FinishDynamicModuleImport()` with
+`JS::FinishDynamicModuleImport_NoTLA()`.
+The latter function now requires a status, either
+`JS::DynamicImportStatus::Ok` or `JS::DynamicImportStatus::Failed`.
+Additionally, it gets passed the module request object instead of the
+module specifier string.
+
+<!-- TODO: Add information on how to enable top-level await. -->
+
+### Script compile options ###
+
+`JS::CompileOptions` now has some different responsibilities regarding
+JS scripts.
+Setting script private values has moved to a separate API.
+Conversely, it's now required to set a flag on `JS::CompileOptions` when
+using the scope chain parameter of `JS::Evaluate()` or
+`JS_ExecuteScript()`.
+(Bug [1702278](https://bugzilla.mozilla.org/show_bug.cgi?id=1702278))
+
+**Recommendations:** First, if you were using scope chains, make sure to
+set the appropriate flag on your compile options using
+`JS::CompileOptions::setNonSyntacticScope()`.
+
+Then, if you were using `JS::CompileOptions::setPrivateValue()` (likely,
+if you were using dynamic module imports; otherwise, probably not),
+replace it with
+`JS::SetScriptPrivate()`.
+This may require splitting a `JS::Evaluate()` call into two separate
+steps of `JS::Compile()` and `JS_ExecuteScript()`.
+
+```c++
+// old
+JS::CompileOptions options(cx);
+options.setPrivateValue(v);
+if (!JS::Evaluate(cx, options, code, &retval)) return false;
+
+// new
+JS::CompileOptions options(cx);
+JS::RootedScript script(cx, JS::Compile(cx, options, code));
+if (!script) return false;
+JS::SetScriptPrivate(script, v);
+if (!JS_EvaluateScript(cx, script, &retval)) return false;
+```
+
+### Maybe-based property descriptor API ###
+
+`JS_GetPropertyDescriptor()` and similar functions previously used the
+confusingly-named `JS::PropertyDescriptor::object()` method on the
+returned property descriptor to indicate whether the property was found
+or not.
+Now these functions use `mozilla::Maybe` in their signatures, and the
+`object()` method is gone.
+(Bug [1706404](https://bugzilla.mozilla.org/show_bug.cgi?id=1706404))
+
+**Recommendation:** This may require some restructuring of your code.
+Instead of using a `JS::Rooted<JS::PropertyDescriptor>` to hold the out
+parameter, use `JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>>`.
+On the returned value, check `isSome()` instead of `object()` to see if
+a property descriptor exists, and if it does, use `->` instead of `.` to
+access its methods.
+
+### Headers ###
+
+There are now more headers which should be included separately in code
+which uses their functionality.
+In particular, several things from `<jsfriendapi.h>` have moved into
+separate headers in a `js/friend/` subdirectory.
+
+This is a list of common ones that might be used by embeddings, but in
+general if you are missing function definitions when compiling your
+code, try checking if you might have to include another header.
+
+- `JS::ExceptionStack` — `<js/Exception.h>`
+  (Bug [1626100](https://bugzilla.mozilla.org/show_bug.cgi?id=1626100))
+- `js::GetErrorMessage()` — `<js/friend/ErrorMessages.h>`
+  (Bug [1654927](https://bugzilla.mozilla.org/show_bug.cgi?id=1654927))
+- `js::DumpValue()`, `js::DumpString()`, and similar functions —
+  `<js/friend/DumpFunctions.h>`
+  (Bug [1656411](https://bugzilla.mozilla.org/show_bug.cgi?id=1656411))
+- `JS::GetPrivate()`, `JS::SetPrivate()`, `JS::GetClass()`,
+  `JS::GetReservedSlot()`, `JS::SetReservedSlot()`, and other `Object`
+  functions — `<js/Object.h>`
+  (Bug [1663365](https://bugzilla.mozilla.org/show_bug.cgi?id=1663365))
+- `JS::StringHasLatin1Chars()` and other `String` functions —
+  `<js/String.h>`
+  (Bug [1663365](https://bugzilla.mozilla.org/show_bug.cgi?id=1663365))
+- Various `ArrayBuffer` and typed-array methods —
+  `<js/experimental/TypedData.h>`
+  (Bug [1656411](https://bugzilla.mozilla.org/show_bug.cgi?id=1656411))
+- `JS_ReportOutOfMemory()` — `<js/ErrorReport.h>`
+- `JSAutoRealm` — `<js/Realm.h>`
+- `JS_GetContextPRivate()` — `<js/Context.h>`
+
+Additionally, `<js/RequiredDefines.h>` is no longer needed.
+Usually it would automatically have been included by means of the
+pkg-config file, but if you were manually including it, you can remove
+it.
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS_GetPrivate()` → `JS::GetPrivate()`
+- `JS_SetPrivate()` → `JS::SetPrivate()`
+- `JS_GetClass()` → `JS::GetClass()`
+- `JS_GetReservedSlot()` → `JS::GetReservedSlot()`
+- `JS_SetReservedSlot()` → `JS::SetReservedSlot()`
+- `JS_StringHasLatin1Chars()` → `JS::StringHasLatin1Chars()`
+- `js::GetLinearStringLength()` → `JS::GetLinearStringLength()`
+- `js::LinearStringHasLatin1Chars()` →
+  `JS::LinearStringHasLatin1Chars()`
+- `js::GetLatin1LinearStringChars()` →
+  `JS::GetLatin1LinearStringChars()`
+- `js::GetTwoByteLinearStringChars()` →
+  `JS::GetTwoByteLinearStringChars()`
+- `js::GetUint8ArrayLengthAndData()` and friends now use `size_t` for
+  length instead of `uint32_t`
+  (Bug [1674777](https://bugzilla.mozilla.org/show_bug.cgi?id=1674777))
+- `JS::PrintError()` no longer takes `cx` argument
+  (Bug [1711878](https://bugzilla.mozilla.org/show_bug.cgi?id=1711878))
+- `JSPROP_SETTER` and `JSPROP_GETTER` are no longer needed
+  (Bug [1713083](https://bugzilla.mozilla.org/show_bug.cgi?id=1713083))
+- The `JSGCMode` enum and `JSGC_MODE` setting have been replaced by two
+  individual boolean settings, `JSGC_INCREMENTAL_GC_ENABLED` and
+  `JSGC_PER_ZONE_GC_ENABLED`
+  (Bug [1686249](https://bugzilla.mozilla.org/show_bug.cgi?id=1686249))
+- The `JSGCInvocationKind` enum has been replaced by `JS::GCOptions`.
+  (Bug [1709849](https://bugzilla.mozilla.org/show_bug.cgi?id=1709849))
 
 ## ESR 68 to ESR 78 ##
 
