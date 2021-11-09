@@ -148,6 +148,13 @@ On the returned value, check `isSome()` instead of `object()` to see if
 a property descriptor exists, and if it does, use `->` instead of `.` to
 access its methods.
 
+### Initialization ###
+
+Since SpiderMonkey 31 it's been required to call `JS_Init()` at the
+start of the program and `JS_ShutDown()` at the end.
+If you haven't been doing this in your code, now is the time to really
+do it, because it will otherwise trip a debug assertion.
+
 ### Headers ###
 
 There are now more headers which should be included separately in code
