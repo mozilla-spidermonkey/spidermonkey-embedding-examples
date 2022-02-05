@@ -36,12 +36,12 @@ jobs:
           override: true
           default: true
     - name: Get SM pkg
-      run: ./tools/get_sm.sh
+      run: ./tools/get_sm_91.sh
     - name: ccache cache files
       uses: actions/cache@v1.1.0
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.bz2') }}
+        key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.xz') }}
     - name: Build SpiderMonkey
       run: |
         mkdir -p /tmp/mozjs
