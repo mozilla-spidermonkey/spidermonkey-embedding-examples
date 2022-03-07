@@ -32,12 +32,14 @@
  * Windows you may have to set your terminal's codepage to UTF-8. */
 
 class ReplGlobal {
+  enum Slots { GlobalSlot, SlotCount };
+
   bool m_shouldQuit : 1;
 
   ReplGlobal(void) : m_shouldQuit(false) {}
 
   static ReplGlobal* priv(JSObject* global) {
-    auto* retval = static_cast<ReplGlobal*>(JS::GetPrivate(global));
+    auto* retval = JS::GetMaybePtrFromReservedSlot<ReplGlobal>(global, GlobalSlot);
     assert(retval);
     return retval;
   }
@@ -67,9 +69,11 @@ class ReplGlobal {
 constexpr JSFunctionSpec ReplGlobal::functions[];
 
 /* The class of the global object. */
-const JSClass ReplGlobal::klass = {"ReplGlobal",
-                                   JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_PRIVATE,
-                                   &JS::DefaultGlobalClassOps};
+const JSClass ReplGlobal::klass = {
+    "ReplGlobal",
+    JSCLASS_GLOBAL_FLAGS | JSCLASS_HAS_RESERVED_SLOTS(ReplGlobal::SlotCount),
+    &JS::DefaultGlobalClassOps
+};
 
 std::string FormatString(JSContext* cx, JS::HandleString string) {
   std::string buf = "\"";
@@ -135,7 +139,7 @@ JSObject* ReplGlobal::create(JSContext* cx) {
                                              JS::FireOnNewGlobalHook, options));
 
   ReplGlobal* priv = new ReplGlobal();
-  JS::SetPrivate(global, priv);
+  JS::SetReservedSlot(global, GlobalSlot, JS::PrivateValue(priv));
 
   // Define any extra global functions that we want in our environment.
   JSAutoRealm ar(cx, global);
