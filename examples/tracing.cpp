@@ -105,7 +105,7 @@ mozilla::Maybe<JS::PersistentRooted<SafeBox>> globalMaybeSafe;
 
 static bool GlobalRootExample(JSContext* cx) {
   // Initialize the root with cx and allocate a fresh SafeBox.
-  globalPtrSafe.init(cx, new SafeBox);
+  globalPtrSafe.init(cx, js::MakeUnique<SafeBox>());
 
   // If we want to avoid a heap allocation, we can wrap the PersistentRooted in
   // a Maybe. When we emplace the variable, we pass 'cx' for the constructor of
