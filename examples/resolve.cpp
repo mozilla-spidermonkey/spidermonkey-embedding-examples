@@ -29,8 +29,6 @@ namespace zlib {
  * and a `checksum` property. */
 
 class Crc {
-  enum Slots { CrcSlot, SlotCount };
-
   unsigned long m_crc;
 
   Crc(void) : m_crc(zlib::crc32(0L, nullptr, 0)) {}
@@ -69,7 +67,7 @@ class Crc {
   }
 
   static Crc* getPriv(JSObject* obj) {
-    return JS::GetMaybePtrFromReservedSlot<Crc>(obj, CrcSlot);
+    return static_cast<Crc*>(JS::GetPrivate(obj));
   }
 
   static bool isPrototype(JSObject* obj) { return getPriv(obj) == nullptr; }
@@ -96,7 +94,7 @@ class Crc {
     if (!newObj) return false;
 
     Crc* priv = new Crc();
-    JS::SetReservedSlot(newObj, CrcSlot, JS::PrivateValue(priv));
+    JS::SetPrivate(newObj, priv);
 
     args.rval().setObject(*newObj);
     return true;
@@ -186,7 +184,7 @@ class Crc {
     Crc* priv = getPriv(obj);
     if (priv) {
       delete priv;
-      JS::SetReservedSlot(obj, CrcSlot, JS::UndefinedValue());
+      JS::SetPrivate(obj, nullptr);
     }
   }
 
@@ -208,7 +206,7 @@ class Crc {
 
   static constexpr JSClass klass = {
       "Crc",
-      JSCLASS_HAS_RESERVED_SLOTS(SlotCount) | JSCLASS_BACKGROUND_FINALIZE,
+      JSCLASS_HAS_PRIVATE | JSCLASS_BACKGROUND_FINALIZE,
       &Crc::classOps,
   };
 
@@ -231,7 +229,7 @@ class Crc {
 
     // Here's how we tell the prototype apart from instances. The private
     // pointer will be null.
-    JS::SetReservedSlot(proto, CrcSlot, JS::UndefinedValue());
+    JS::SetPrivate(proto, nullptr);
     return true;
   }
 };
