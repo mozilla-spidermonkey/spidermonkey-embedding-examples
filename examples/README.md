@@ -29,6 +29,14 @@ meson _build
 ninja -C _build
 ```
 
+If you installed SpiderMonkey ESR 91 outside of `/usr/local`, you need to
+specify the `PKG_CONFIG_PATH`.
+
+```sh
+PKG_CONFIG_PATH=PATH/TO/MOZJS-91/lib/pkgconfig/ meson _build
+ninja -C _build
+```
+
 ## To contribute ##
 
 Install the clang-format commit hook:
