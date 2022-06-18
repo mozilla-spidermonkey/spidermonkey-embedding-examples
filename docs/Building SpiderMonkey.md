@@ -46,6 +46,8 @@ writable to you without superuser permissions, for example.
 
 ```sh
 cd js/src
+cp configure.in configure
+chmod u+x configure
 mkdir _build
 cd _build
 ../configure --disable-jemalloc --with-system-zlib \
