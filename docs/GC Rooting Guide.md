@@ -336,13 +336,6 @@ JS::RootedValue v(cx, JS::ObjectValue(*otherGCThing));
 js::SetReservedSlot(obj, 0, v);
 ```
 
-Do not use `JS_SetPrivate()` to store a pointer to a GC thing.
-The private field is frequently used to store pointers that are not
-GC things, so the GC cannot automatically handle this slot.
-This means it must be manually traced by the object's owner: this is
-both fragile and more expensive than using an extra reserved slot, or
-even just putting a new property on the object.
-
 #### JSClass ####
 
 When defining a JSClass with a private struct that contains `Heap<T>`
@@ -364,11 +357,13 @@ JSObject, the usual way would be to define a trace hook on the JSObject
 
 ```c++
 class MyClass {
+    enum { PRIVATE_DATA, SLOT_COUNT };
+
     Heap<JSString*> str;
 
   public:
     static void trace(JSTracer* trc, JSObject* obj) {
-        auto* mine = static_cast<MyClass*>(JS_GetPrivate(obj));
+        auto* mine = JS::GetMaybePtrFromReservedSlot<MyClass*>(obj, PRIVATE_DATA);
         mine->trace(trc, "MyClass private field");
     }
 

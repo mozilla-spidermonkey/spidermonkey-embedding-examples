@@ -99,29 +99,59 @@ ordinary JavaScript properties.
 ## Providing private data for objects ##
 
 Like contexts, you can associate large quantities of data with an object
-without having to store the data in the object itself.
-Call `JS_SetPrivate` to establish a pointer to private data for the
-object, and call `JS_GetPrivate` to retrieve the pointer so that you can
-access the data.
+without having to store the data on the object itself where it's
+accessible to JS code.
+
+Objects have 'reserved slots' which protect their contents from garbage
+collection, while keeping them invisible to JS code.
+These slots are numbered, and can hold any [`JS::Value`](./Value.md).
+Use `JS::SetReservedSlot()` and `JS::GetReservedSlot()` to access them.
+
+You can also store a C++ pointer in a reserved slot, by stuffing it into
+a `JS::PrivateValue()`.
 Your application is responsible for creating and managing this optional private data.
 
 To create private data and associate it with an object:
 
+- Specify the number of reserved slots that you'll require in the
+  object's `JSClass` flags, with `JSCLASS_HAS_RESERVED_SLOTS(n)`.
+  It's customary to define an enum for the slots.
 - Establish the private data as you would a normal C void pointer
   variable.
-- Call `JS_SetPrivate`, specify the object for which to establish
-  private data, and specify the pointer to the data.
+- Call `JS::SetReservedSlot()`, specify the object for which to
+  establish private data, the reserved slot number that you've chosen to
+  store the private data, and the pointer to the data.
 
 For example:
 
 ```c++
-JS_SetPrivate(cx, obj, pdata);
+enum { PRIVATE_DATA, SLOT_COUNT };
+
+// ...
+
+const JSClass MyClass = {
+    "MyClass",
+    JSCLASS_HAS_RESERVED_SLOTS(SLOT_COUNT),
+    &MyClassOps,
+};
+
+// ...
+
+JS::SetReservedSlot(obj, PRIVATE_DATA, JS::PrivateValue(pdata));
 ```
 
-To retrieve the data at a later time, call `JS_GetPrivate`, and pass the
-object as an argument.
+To unset the pointer, store `JS::UndefinedValue()` in the slot:
+
+```c++
+// This removes the pointer from the reserved slot:
+JS::SetReservedSlot(obj, PRIVATE_DATA, JS::UndefinedValue());
+```
+
+There is a convenience function to retrieve a pointer from a reserved
+slot at a later time, and cast it to the correct type:
+`JS::GetMaybePtrFromReservedSlot<T>()`.
 This function returns the pointer to an object's private data:
 
 ```c++
-pdata = JS_GetPrivate(cx, obj);
+pdata = JS::GetMaybePtrFromReservedSlot<MyPrivateData>(obj, PRIVATE_DATA);
 ```
