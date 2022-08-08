@@ -146,12 +146,12 @@ class Crc {
       return true;
     }
 
-    if (!JSID_IS_STRING(id)) {
+    if (!id.isString()) {
       *resolved = false;
       return true;
     }
 
-    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
+    JSLinearString* str = id.toLinearString();
 
     if (JS_LinearStringEqualsAscii(str, "update")) {
       if (!JS_DefineFunctionById(cx, obj, id, &Crc::update, 1,
@@ -175,14 +175,14 @@ class Crc {
 
   static bool mayResolve(const JSAtomState& names, jsid id,
                          JSObject* maybeObj) {
-    if (!JSID_IS_STRING(id)) return false;
+    if (!id.isString()) return false;
 
-    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
+    JSLinearString* str = id.toLinearString();
     return JS_LinearStringEqualsAscii(str, "update") ||
            JS_LinearStringEqualsAscii(str, "checksum");
   }
 
-  static void finalize(JSFreeOp* fop, JSObject* obj) {
+  static void finalize(JS::GCContext* gcx, JSObject* obj) {
     Crc* priv = getPriv(obj);
     if (priv) {
       delete priv;
