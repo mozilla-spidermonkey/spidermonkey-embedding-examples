@@ -201,7 +201,6 @@ class Crc {
       &Crc::mayResolve,
       &Crc::finalize,
       nullptr,  // call
-      nullptr,  // hasInstance
       nullptr,  // construct
       nullptr,  // trace
   };
