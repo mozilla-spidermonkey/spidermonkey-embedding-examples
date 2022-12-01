@@ -80,26 +80,26 @@ bool DefineFunctions(JSContext* cx, JS::Handle<JSObject*> global) {
   return true;
 }
 
-static void* WorkerMain(void* arg) {
-  JSRuntime* parentRuntime = reinterpret_cast<JSRuntime*>(arg);
-
+static void WorkerMain(JSRuntime* parentRuntime) {
   JSContext* cx = JS_NewContext(8L * 1024L * 1024L, parentRuntime);
 
   if (!JS::InitSelfHostedCode(cx)) {
-    return nullptr;
+    fprintf(stderr, "Error: Failed during JS::InitSelfHostedCode\n");
+    return;
   }
 
   {
     JS::Rooted<JSObject*> global(cx, boilerplate::CreateGlobal(cx));
     if (!global) {
-      return nullptr;
+      fprintf(stderr, "Error: Failed during boilerplate::CreateGlobal\n");
+      return;
     }
 
     JSAutoRealm ar(cx, global);
 
     if (!DefineFunctions(cx, global)) {
       boilerplate::ReportAndClearException(cx);
-      return nullptr;
+      return;
     }
 
     if (!ExecuteCode(cx, R"js(
@@ -109,21 +109,13 @@ for (let i = 0; i < 10; i++) {
 }
     )js")) {
       boilerplate::ReportAndClearException(cx);
-      return nullptr;
+      return;
     }
   }
 
   JS_DestroyContext(cx);
 
-  return nullptr;
-}
-
-static bool CreateWorker(JSContext* cx, pthread_t* thread) {
-  if (pthread_create(thread, nullptr, WorkerMain, JS_GetRuntime(cx)) != 0) {
-    return false;
-  }
-
-  return true;
+  return;
 }
 
 static bool WorkerExample(JSContext* cx) {
@@ -132,15 +124,8 @@ static bool WorkerExample(JSContext* cx) {
     return false;
   }
 
-  pthread_t thread1;
-  pthread_t thread2;
-
-  if (!CreateWorker(cx, &thread1)) {
-    return false;
-  }
-  if (!CreateWorker(cx, &thread2)) {
-    return false;
-  }
+  std::thread thread1(WorkerMain, JS_GetRuntime(cx));
+  std::thread thread2(WorkerMain, JS_GetRuntime(cx));
 
   JSAutoRealm ar(cx, global);
 
@@ -159,8 +144,8 @@ for (let i = 0; i < 10; i++) {
     return false;
   }
 
-  pthread_join(thread1, nullptr);
-  pthread_join(thread2, nullptr);
+  thread1.join();
+  thread2.join();
 
   return true;
 }
