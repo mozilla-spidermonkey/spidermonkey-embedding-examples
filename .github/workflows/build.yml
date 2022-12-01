@@ -36,7 +36,7 @@ jobs:
           override: true
           default: true
     - name: Get SM pkg
-      run: ./tools/get_sm_91.sh
+      run: ./tools/get_sm_102.sh
     - name: ccache cache files
       uses: actions/cache@v1.1.0
       with:

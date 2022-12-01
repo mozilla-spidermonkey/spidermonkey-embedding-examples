@@ -29,6 +29,8 @@ namespace zlib {
  * and a `checksum` property. */
 
 class Crc {
+  enum Slots { CrcSlot, SlotCount };
+
   unsigned long m_crc;
 
   Crc(void) : m_crc(zlib::crc32(0L, nullptr, 0)) {}
@@ -67,7 +69,7 @@ class Crc {
   }
 
   static Crc* getPriv(JSObject* obj) {
-    return static_cast<Crc*>(JS::GetPrivate(obj));
+    return JS::GetMaybePtrFromReservedSlot<Crc>(obj, CrcSlot);
   }
 
   static bool isPrototype(JSObject* obj) { return getPriv(obj) == nullptr; }
@@ -94,7 +96,7 @@ class Crc {
     if (!newObj) return false;
 
     Crc* priv = new Crc();
-    JS::SetPrivate(newObj, priv);
+    JS::SetReservedSlot(newObj, CrcSlot, JS::PrivateValue(priv));
 
     args.rval().setObject(*newObj);
     return true;
@@ -144,12 +146,12 @@ class Crc {
       return true;
     }
 
-    if (!JSID_IS_STRING(id)) {
+    if (!id.isString()) {
       *resolved = false;
       return true;
     }
 
-    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
+    JSLinearString* str = id.toLinearString();
 
     if (JS_LinearStringEqualsAscii(str, "update")) {
       if (!JS_DefineFunctionById(cx, obj, id, &Crc::update, 1,
@@ -173,18 +175,18 @@ class Crc {
 
   static bool mayResolve(const JSAtomState& names, jsid id,
                          JSObject* maybeObj) {
-    if (!JSID_IS_STRING(id)) return false;
+    if (!id.isString()) return false;
 
-    JSLinearString* str = JSID_TO_LINEAR_STRING(id);
+    JSLinearString* str = id.toLinearString();
     return JS_LinearStringEqualsAscii(str, "update") ||
            JS_LinearStringEqualsAscii(str, "checksum");
   }
 
-  static void finalize(JSFreeOp* fop, JSObject* obj) {
+  static void finalize(JS::GCContext* gcx, JSObject* obj) {
     Crc* priv = getPriv(obj);
     if (priv) {
       delete priv;
-      JS::SetPrivate(obj, nullptr);
+      JS::SetReservedSlot(obj, CrcSlot, JS::UndefinedValue());
     }
   }
 
@@ -199,14 +201,13 @@ class Crc {
       &Crc::mayResolve,
       &Crc::finalize,
       nullptr,  // call
-      nullptr,  // hasInstance
       nullptr,  // construct
       nullptr,  // trace
   };
 
   static constexpr JSClass klass = {
       "Crc",
-      JSCLASS_HAS_PRIVATE | JSCLASS_BACKGROUND_FINALIZE,
+      JSCLASS_HAS_RESERVED_SLOTS(SlotCount) | JSCLASS_BACKGROUND_FINALIZE,
       &Crc::classOps,
   };
 
@@ -229,7 +230,7 @@ class Crc {
 
     // Here's how we tell the prototype apart from instances. The private
     // pointer will be null.
-    JS::SetPrivate(proto, nullptr);
+    JS::SetReservedSlot(proto, CrcSlot, JS::UndefinedValue());
     return true;
   }
 };

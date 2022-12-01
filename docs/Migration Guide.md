@@ -3,6 +3,162 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
+## ESR 91 to ESR 102 ##
+
+### Object private pointers ###
+
+In previous versions of SpiderMonkey, it was common to associate C++
+structs with JS objects by using `JS_SetPrivate()` and `JS_GetPrivate()`
+on the JS object. These APIs have been removed.
+
+Instead, stuff the C++ struct pointer into a `JS::PrivateValue` and put
+it in one of the object's reserved slots with `JS::SetReservedSlot()`.
+
+**Recommendation:** To do this, you will have to change a few things.
+First, the `JSCLASS_HAS_PRIVATE` flag no longer exists, so you need to
+remove it and instead give the class an additional reserved slot in its
+`JSClass` definition.
+For example:
+
+```c++
+// old
+static constexpr JSClass klass = {
+    "MyClass",
+    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(2) | JSCLASS_BACKGROUND_FINALIZE,
+    &class_ops,
+};
+
+// new
+static constexpr JSClass klass = {
+    "MyClass",
+    JSCLASS_HAS_RESERVED_SLOTS(3) | JSCLASS_BACKGROUND_FINALIZE,
+    &class_ops,
+};
+```
+
+Then, replace `JS_SetPrivate()` with `JS::SetReservedSlot()` and
+`JS::PrivateValue`.
+Note that to set a null pointer, you should store `JS::UndefinedValue()`
+in the reserved slot, not `JS::PrivateValue(nullptr)`.
+
+```c++
+// old
+JS_SetPrivate(obj1, ptr);
+JS_SetPrivate(obj2, nullptr);
+
+// new
+JS::SetReservedSlot(obj1, POINTER, JS::PrivateValue(ptr));
+JS::SetReservedSlot(obj2, POINTER, JS::UndefinedValue());
+// (POINTER is an enum value indicating which reserved slot stores the
+// private data. For example, it could be 0. You define it yourself.)
+```
+
+Finally, replace `JS_GetPrivate()` with
+`JS::GetMaybePtrFromReservedSlot()`, which takes a template parameter
+indicating the type of the pointer.
+
+```c++
+// old
+MyData* ptr = static_cast<MyData*>(JS_GetPrivate(obj1));
+
+// new
+MyData* ptr = JS::GetMaybePtrFromReservedSlot<MyData>(obj1, POINTER);
+```
+
+These changes can all be done before the migration, except that
+SpiderMonkey 91 does not have `JS::GetMaybePtrFromReservedSlot()`.
+To work around this, you can open-code it and later remove it after the
+migration:
+
+```c++
+template <typename T>
+inline T* MyGetMaybePtrFromReservedSlot(JSObject* obj, size_t slot) {
+    JS::Value v = JS::GetReservedSlot(obj, slot);
+    return v.isUndefined() ? nullptr : static_cast<T*>(v.toPrivate());
+}
+```
+
+Additionally, if you have any `JS::Heap<>` pointers to GC things as
+members of your private C++ structs, this migration might be a good time
+to consider moving those GC things into their own reserved slots on the
+object, and just keep C++ data in the C++ struct.
+This technique might not be right for every codebase, but it's worth
+considering.
+
+### Property keys ###
+
+As in the previous migration from 78 to 91, more JSID macros have now
+been replaced by methods of `JS::PropertyKey`.
+
+**Recommendation:** Before the migration, replace `JSID_IS_VOID` (or an
+equality comparison to `JSID_VOID`) with `id.isVoid()`.
+
+After the migration, replace the following:
+- `JSID_VOID` → `JS::PropertyKey::Void()`
+- `SYMBOL_TO_JSID()` → `JS::PropertyKey::Symbol()`
+- `JSID_BITS(id)` → `id.asRawBits()`
+- `JSID_TO_LINEAR_STRING(id)` → `id.toLinearString()`
+
+### Headers ###
+
+There are now more headers which should be included separately in code
+which uses their functionality.
+
+This is a list of common ones that might be used by embeddings, but in
+general if you are missing function definitions when compiling your
+code, try checking if you might have to include another header.
+
+- `JS::Call`, `JS::Construct`, and related — `<js/CallAndConstruct.h>`
+- `JS_DefineDebuggerObject()` — `<js/Debug.h>`
+- `JS::CurrentGlobalOrNull()` — `<js/GlobalObject.h>`
+- `JS_DefineProperty()`, `JS_DefineFunction()`, `JS_Enumerate()`,
+  `JS_GetElement()`, `JS_GetProperty()`, `JS_HasProperty()`,
+  `JS_SetProperty()`, and many other functions related to accessing
+  properties or array elements — `<js/PropertyAndElement.h>`
+- `JS::GetScriptPrivate()` and `JS::SetScriptPrivate()` —
+  `<js/ScriptPrivate.h>`
+- `JS::BuildStackString()` and other functions related to the call stack
+  — `<js/Stack.h>`
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS::PropertyKey::fromNonIntAtom()` → `JS::PropertyKey::NonIntAtom()`
+- `JS::SafelyInitialized<T>()` → `JS::SafelyInitialized<T>::create()`
+- `JSFreeOp` → `JS::GCContext` (in particular, in finalize operations)
+- `JS_UpdateWeakPointerAfterGC()` and weak-pointer update callbacks now
+  take an additional `JSTracer*` argument.
+
+The following things have been removed.
+In several cases, you can make the necessary changes before the
+migration already.
+
+- `JS_AtomizeAndPinJSString()` has been removed, there is no direct
+  replacement. There are several `JS_AtomizeAndPin...` APIs that might
+  work instead.
+- `JS::CloneAndExecuteScript()` has been removed.
+  Usually, if the compilation cost isn't significant, `JS::Evaluate()`,
+  or `JS::Compile()` followed by `JS_ExecuteScript()`, should be
+  sufficient.
+  If the reason to use `JS::CloneAndExecuteScript()` was because the
+  compilation cost was problematic, then instead use
+  `JS::CompileGlobalScriptToStencil()`, and get a `JSScript` in the new
+  realm with `JS::InstantiateGlobalStencil()`.
+- `JSClassOps::hasInstance` is removed.
+  Instead of overriding the `instanceof` behaviour in `JSClassOps`, you
+  should define a `[Symbol.hasInstance]` property on the prototype
+  object that implements the overridden behaviour.
+
+In addition, `JS::Rooted` had a convenience constructor that would
+forward its `JSContext*` argument to the template type `T` if there was
+a constructor with the signature `T(JSContext*)`.
+This constructor has been removed, so you may need to duplicate a
+`JSContext*` argument, e.g.:
+```c++
+JS::Rooted<JS::IdVector> ids(cx, cx);
+```
+
 ## ESR 78 to ESR 91 ##
 
 ### Object construction ###
