@@ -16,7 +16,7 @@ import sys
 import os
 from xml.sax.saxutils import escape
 
-SOURCE_BASE = 'https://searchfox.org/mozilla-esr91/source'
+SOURCE_BASE = 'https://searchfox.org/mozilla-esr102/source'
 
 FORMAT_TO_IGNORE = {
     "JOF_BYTE",

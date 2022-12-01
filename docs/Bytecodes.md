@@ -1,7 +1,7 @@
 # Bytecode Listing #
 
 This document is automatically generated from
-[`Opcodes.h`](https://searchfox.org/mozilla-esr91/source/js/src/vm/Opcodes.h) by
+[`Opcodes.h`](https://searchfox.org/mozilla-esr102/source/js/src/vm/Opcodes.h) by
 [`make_opcode_doc.py`](../tools/make_opcode_doc.py).
 
 ## Background ##
@@ -160,7 +160,7 @@ Push the BigInt constant `script->getBigInt(bigIntIndex)`.
 Push the string constant `script->getAtom(atomIndex)`.
 
 
-**Format:** JOF_ATOM
+**Format:** JOF_STRING
 
 ##### `Symbol`
 
@@ -171,6 +171,106 @@ Push the string constant `script->getAtom(atomIndex)`.
 Push a well-known symbol.
 
 `symbol` must be in range for `JS::SymbolCode`.
+
+
+
+### Compound primitives ###
+
+#### Record literals ####
+
+
+
+##### `InitRecord`
+
+**Operands:** `(uint32_t length)`
+
+**Stack:** &rArr; `rval`
+
+Initialize a new record, preallocating `length` memory slots. `length` can still grow
+if needed, for example when using the spread operator.
+
+Implements: [RecordLiteral Evaluation][1] step 1.
+
+[1]: https://tc39.es/proposal-record-tuple/#sec-record-initializer-runtime-semantics-evaluation
+
+
+
+##### `AddRecordProperty`
+
+
+**Stack:** `record, key, value` &rArr; `record`
+
+Add the last element in the stack to the preceding tuple.
+
+Implements: [AddPropertyIntoRecordEntriesList][1].
+
+[1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
+
+
+
+##### `AddRecordSpread`
+
+
+**Stack:** `record, value` &rArr; `record`
+
+Add the last element in the stack to the preceding tuple.
+
+Implements: [RecordPropertyDefinitionEvaluation][1] for
+  RecordPropertyDefinition : ... AssignmentExpression
+
+[1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
+
+
+
+##### `FinishRecord`
+
+
+**Stack:** `record` &rArr; `record`
+
+Mark a record as "initialized", going from "write-only" mode to
+"read-only" mode.
+
+
+
+#### Tuple literals ####
+
+
+
+##### `InitTuple`
+
+**Operands:** `(uint32_t length)`
+
+**Stack:** &rArr; `rval`
+
+Initialize a new tuple, preallocating `length` memory slots. `length` can still grow
+if needed, for example when using the spread operator.
+
+Implements: [TupleLiteral Evaluation][1] step 1.
+
+[1]: https://tc39.es/proposal-record-tuple/#sec-tuple-initializer-runtime-semantics-evaluation
+
+
+
+##### `AddTupleElement`
+
+
+**Stack:** `tuple, element` &rArr; `tuple`
+
+Add the last element in the stack to the preceding tuple.
+
+Implements: [AddValueToTupleSequenceList][1].
+
+[1]: https://tc39.es/proposal-record-tuple/#sec-addvaluetotuplesequencelist
+
+
+
+##### `FinishTuple`
+
+
+**Stack:** `tuple` &rArr; `tuple`
+
+Mark a tuple as "initialized", going from "write-only" mode to
+"read-only" mode.
 
 
 
@@ -562,6 +662,16 @@ sequence `GetLocal "x"; One; Sub; SetLocal "x"` does not give us.
 
 
 
+##### `IsNullOrUndefined`
+
+
+**Stack:** `val` &rArr; `val, IsNullOrUndefined(val)`
+
+Test whether the value on top of the stack is `NullValue` or
+`UndefinedValue` and push the boolean result.
+
+
+
 ##### `GlobalThis`
 
 
@@ -569,6 +679,19 @@ sequence `GetLocal "x"; One; Sub; SetLocal "x"` does not give us.
 
 Push the global `this` value. Not to be confused with the `globalThis`
 property on the global.
+
+This must be used only in scopes where `this` refers to the global
+`this`.
+
+
+
+##### `NonSyntacticGlobalThis`
+
+
+**Stack:** &rArr; `this`
+
+Push the global `this` value for non-syntactic scope. Not to be confused
+with the `globalThis` property on the global.
 
 This must be used only in scopes where `this` refers to the global
 `this`.
@@ -584,9 +707,7 @@ Push the value of `new.target`.
 
 The result is a constructor or `undefined`.
 
-This must be used only in scripts where `new.target` is allowed:
-non-arrow function scripts and other scripts that have a non-arrow
-function script on the scope chain.
+This must be used only in non-arrow function scripts.
 
 Implements: [GetNewTarget][1].
 
@@ -597,7 +718,7 @@ Implements: [GetNewTarget][1].
 ##### `DynamicImport`
 
 
-**Stack:** `moduleId` &rArr; `promise`
+**Stack:** `moduleId, options` &rArr; `promise`
 
 Dynamic import of the module specified by the string value on the top of
 the stack.
@@ -637,19 +758,18 @@ Create and push a new object with no properties.
 
 ##### `NewObject`
 
-**Operands:** `(uint32_t baseobjIndex)`
+**Operands:** `(uint32_t shapeIndex)`
 
 **Stack:** &rArr; `obj`
 
 Create and push a new object of a predetermined shape.
 
-The new object has the shape of the template object
-`script->getObject(baseobjIndex)`. Subsequent `InitProp` instructions
-must fill in all slots of the new object before it is used in any other
-way.
+The new object has the shape `script->getShape(shapeIndex)`.
+Subsequent `InitProp` instructions must fill in all slots of the new
+object before it is used in any other way.
 
 
-**Format:** JOF_OBJECT, JOF_IC
+**Format:** JOF_SHAPE, JOF_IC
 
 ##### `Object`
 
@@ -1027,6 +1147,17 @@ Two arguments:
 
 
 **Format:** JOF_TWO_UINT8, JOF_CHECKSTRICT, JOF_IC
+
+##### `NewPrivateName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `private_name`
+
+Push a new private name.
+
+
+**Format:** JOF_ATOM
 
 #### Super ####
 
@@ -1441,34 +1572,14 @@ Push a new function object.
 
 The new function inherits the current environment chain.
 
-Used to create most JS functions. Notable exceptions are arrow functions
-and derived or default class constructors.
-
-The function indicated by `funcIndex` must be a non-arrow function.
+Used to create most JS functions. Notable exceptions are derived or
+default class constructors.
 
 Implements: [InstantiateFunctionObject][1], [Evaluation for
 *FunctionExpression*][2], and so on.
 
 [1]: https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-instantiatefunctionobject
 [2]: https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-
-
-**Format:** JOF_OBJECT
-
-##### `LambdaArrow`
-
-**Operands:** `(uint32_t funcIndex)`
-
-**Stack:** `newTarget` &rArr; `arrowFn`
-
-Push a new arrow function.
-
-`newTarget` matters only if the arrow function uses the expression
-`new.target`. It should be the current value of `new.target`, so that
-the arrow function inherits `new.target` from the enclosing scope. (If
-`new.target` is illegal here, the value doesn't matter; use `null`.)
-
-The function indicated by `funcIndex` must be an arrow function.
 
 
 **Format:** JOF_OBJECT
@@ -1547,7 +1658,7 @@ Implements: [ClassDefinitionEvaluation][1] steps 6.e.ii, 6.g.iii, and
 
 
 
-##### `Call`, `CallIter`, `FunApply`, `FunCall`, `CallIgnoresRv`
+##### `Call`, `CallIter`, `CallIgnoresRv`
 
 **Operands:** `(uint16_t argc)`
 
@@ -1560,12 +1671,6 @@ a TypeError if `callee` isn't a function.
 ensure error messages are formatted with `JSMSG_NOT_ITERABLE` ("x is not
 iterable") rather than `JSMSG_NOT_FUNCTION` ("x[Symbol.iterator] is not
 a function"). The `argc` operand must be 0 for this variation.
-
-`JSOp::FunApply` hints to the VM that this is likely a call to the
-builtin method `Function.prototype.apply`, an easy optimization target.
-
-`JSOp::FunCall` similarly hints to the VM that the callee is likely
-`Function.prototype.call`.
 
 `JSOp::CallIgnoresRv` hints to the VM that the return value is ignored.
 This allows alternate faster implementations to be used that avoid
@@ -1598,15 +1703,14 @@ populating it using `JSOp::InitElemArray`.
 ##### `OptimizeSpreadCall`
 
 
-**Stack:** `arr` &rArr; `arr, optimized`
+**Stack:** `iterable` &rArr; `array_or_undefined`
 
-Push true if `arr` is an array object that can be passed directly as the
-`args` argument to `JSOp::SpreadCall`.
+Push an array object that can be passed directly as the `args` argument
+to `JSOp::SpreadCall`. If the operation can't be optimized, push
+`undefined` instead.
 
 This instruction and the branch around the iterator loop are emitted
-only when `arr` is itself a rest parameter, as in `(...arr) =>
-f(...arr)`, a strong hint that it's a packed Array whose prototype is
-`Array.prototype`.
+only when `iterable` is the sole argument in a call, as in `f(...arr)`.
 
 See `js::OptimizeSpreadCall`.
 
@@ -1693,37 +1797,14 @@ binding.  For example, in `with (date) { getFullYear(); }`, the
 implicit `this` passed to `getFullYear` is `date`, not `undefined`.
 
 This walks the run-time environment chain looking for the environment
-record that contains the function. If the function call is not inside a
-`with` statement, use `JSOp::GImplicitThis` instead. If the function call
-definitely refers to a local binding, use `JSOp::Undefined`.
+record that contains the function. If the function call definitely
+refers to a local binding, use `JSOp::Undefined`.
 
 Implements: [EvaluateCall][1] step 1.b. But not entirely correctly.
 See [bug 1166408][2].
 
 [1]: https://tc39.es/ecma262/#sec-evaluatecall
 [2]: https://bugzilla.mozilla.org/show_bug.cgi?id=1166408
-
-
-**Format:** JOF_ATOM
-
-##### `GImplicitThis`
-
-**Operands:** `(uint32_t nameIndex)`
-
-**Stack:** &rArr; `this`
-
-Like `JSOp::ImplicitThis`, but the name must not be bound in any local
-environments.
-
-The result is always `undefined` except when the name refers to a
-binding in a non-syntactic `with` environment.
-
-Note: The frontend has to emit `JSOp::GImplicitThis` (and not
-`JSOp::Undefined`) for global unqualified function calls, even when
-`CompileOptions::nonSyntacticScope == false`, because later
-`js::CloneGlobalScript` can be called with `ScopeKind::NonSyntactic` to
-clone the script into a non-syntactic environment, with the bytecode
-reused, unchanged.
 
 
 **Format:** JOF_ATOM
@@ -2408,14 +2489,15 @@ be an object. The script can use `JSOp::CheckReturn` to ensure this.
 ##### `CheckReturn`
 
 
-**Stack:** `thisval` &rArr;
+**Stack:** `thisval` &rArr; `rval`
 
 Check the return value in a derived class constructor.
 
--   If the current stack frame's `returnValue` is an object, do nothing.
+-   If the current stack frame's `returnValue` is an object, push
+    `returnValue` onto the stack.
 
 -   Otherwise, if the `returnValue` is undefined and `thisval` is an
-    object, store `thisval` in the `returnValue` slot.
+    object, push `thisval` onto the stack.
 
 -   Otherwise, throw a TypeError.
 
@@ -2524,99 +2606,11 @@ part of for-of iteration.
 
 
 
-##### `ResumeIndex`
-
-**Operands:** `(uint24_t resumeIndex)`
-
-**Stack:** &rArr; `resumeIndex`
-
-Push `resumeIndex`.
-
-This value must be used only by `JSOp::Gosub`, `JSOp::Finally`, and `JSOp::Retsub`.
-
-
-**Format:** JOF_RESUMEINDEX
-
-##### `Gosub`
-
-**Operands:** `(int32_t forwardOffset)`
-
-**Stack:** `false, resumeIndex` &rArr;
-
-Jump to the start of a `finally` block.
-
-`JSOp::Gosub` is unusual: if the finally block finishes normally, it will
-reach the `JSOp::Retsub` instruction at the end, and control then
-"returns" to the `JSOp::Gosub` and picks up at the next instruction, like
-a function call but within a single script and stack frame. (It's named
-after the thing in BASIC.)
-
-We need this because a `try` block can terminate in several different
-ways: control can flow off the end, return, throw an exception, `break`
-with or without a label, or `continue`. Exceptions are handled
-separately; but all those success paths are written as bytecode, and
-each one needs to run the `finally` block before continuing with
-whatever they were doing. They use `JSOp::Gosub` for this. It is thus
-normal for multiple `Gosub` instructions in a script to target the same
-`finally` block.
-
-Rules: `forwardOffset` must be positive and must target a
-`JSOp::JumpTarget` instruction followed by `JSOp::Finally`. The
-instruction immediately following `JSOp::Gosub` in the script must be a
-`JSOp::JumpTarget` instruction, and `resumeIndex` must be the index into
-`script->resumeOffsets()` that points to that instruction.
-
-Note: This op doesn't actually push or pop any values. Its use count of
-2 is a lie to make the stack depth math work for this very odd control
-flow instruction.
-
-`JSOp::Gosub` is considered to have two "successors": the target of
-`offset`, which is the actual next instruction to run; and the
-instruction immediately following `JSOp::Gosub`, even though it won't run
-until later. We define the successor graph this way in order to support
-knowing the stack depth at that instruction without first reading the
-whole `finally` block.
-
-The stack depth at that instruction is, as it happens, the current stack
-depth minus 2. So this instruction gets nuses == 2.
-
-Unfortunately there is a price to be paid in horribleness. When
-`JSOp::Gosub` runs, it leaves two values on the stack that the stack
-depth math doesn't know about. It jumps to the finally block, where
-`JSOp::Finally` again does nothing to the stack, but with a bogus def
-count of 2, restoring balance to the accounting. If `JSOp::Retsub` is
-reached, it pops the two values (for real this time) and control
-resumes at the instruction that follows JSOp::Gosub in memory.
-
-
-**Format:** JOF_JUMP
-
 ##### `Finally`
 
 
-**Stack:** &rArr; `false, resumeIndex`
 
-No-op instruction that marks the start of a `finally` block. This has a
-def count of 2, but the values are already on the stack (they're
-actually left on the stack by `JSOp::Gosub`).
-
-These two values must not be used except by `JSOp::Retsub`.
-
-
-
-##### `Retsub`
-
-
-**Stack:** `throwing, v` &rArr;
-
-Jump back to the next instruction, or rethrow an exception, at the end
-of a `finally` block. See `JSOp::Gosub` for the explanation.
-
-If `throwing` is true, throw `v`. Otherwise, `v` must be a resume index;
-jump to the corresponding offset within the script.
-
-The two values popped must be the ones notionally pushed by
-`JSOp::Finally`.
+No-op instruction that marks the start of a `finally` block.
 
 
 
@@ -2761,10 +2755,9 @@ Implements: [GetThisBinding][1] step 3.
 
 **Stack:** &rArr; `global`
 
-Push the global environment onto the stack, unless the script has a
-non-syntactic global scope. In that case, this acts like JSOp::BindName.
-
-`nameIndex` is only used when acting like JSOp::BindName.
+Look up a name on the global lexical environment's chain and push the
+environment which contains a binding for that name. If no such binding
+exists, push the global lexical environment.
 
 
 **Format:** JOF_ATOM, JOF_NAME, JOF_GNAME, JOF_IC
@@ -2826,8 +2819,8 @@ global object properties.)
 This is an optimized version of `JSOp::GetName` that skips all local
 scopes, for use when the name doesn't refer to any local binding.
 `NonSyntacticVariablesObject`s break this optimization, so if the
-current script has a non-syntactic global scope, this acts like
-`JSOp::GetName`.
+current script has a non-syntactic global scope, use `JSOp::GetName`
+instead.
 
 Like `JSOp::GetName`, this throws a ReferenceError if no such binding is
 found (unless the next instruction is `JSOp::Typeof`) or if the binding
