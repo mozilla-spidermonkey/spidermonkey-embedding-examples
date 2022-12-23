@@ -737,7 +737,16 @@ static bool ModifyStringPrototype(JSContext* cx, JS::HandleObject global) {
  *     static static_method(a, b) { return a + b; }
  * }
  */
-static JSClass myClass = {"MyClass", JSCLASS_HAS_RESERVED_SLOTS(2), nullptr};
+
+
+// This will define the layout of MyClass prototype, i.e. MyClass.prototype
+// Note that the JSClass should not be allocated on stack and it should be alive
+// during the whole execution. JSClass pointer are stored and the content is
+// never copied. Thus his content must stay the same.
+static JSClass myClassPrototype = {"MyClass", JSCLASS_HAS_RESERVED_SLOTS(1), nullptr};
+
+// This will define the layout of MyClass instances
+static JSClass myClassInstance  = {"MyClassInstance",  JSCLASS_HAS_RESERVED_SLOTS(2), nullptr};
 
 enum MyClassSlots { SlotA, SlotB };
 
@@ -804,7 +813,7 @@ static bool MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS_ReportErrorASCII(cx, "You must call this constructor with 'new'");
     return false;
   }
-  JS::RootedObject thisObj(cx, JS_NewObjectForConstructor(cx, &myClass, args));
+  JS::RootedObject thisObj(cx, JS_NewObjectForConstructor(cx, &myClassInstance, args));
   if (!thisObj) return false;
 
   // Slightly different from the 'private' properties in the JS example, here
@@ -819,7 +828,11 @@ static bool MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool DefineMyClass(JSContext* cx, JS::HandleObject global) {
   JS::RootedObject protoObj(
-      cx, JS_InitClass(cx, global, nullptr, &myClass,
+      cx, JS_InitClass(cx, global, nullptr,
+                       // This JSClass will be used for the layout of prototype
+                       // and the JSClass.name is used as property name of
+                       // global object above.
+                       &myClassPrototype,
                        // native constructor function and min arg count
                        MyClassConstructor, 2,
 
@@ -835,6 +848,12 @@ static bool DefineMyClass(JSContext* cx, JS::HandleObject global) {
   // You can add anything else here to protoObj (which is available as
   // MyClass.prototype in JavaScript). For example, call JS_DefineProperty() to
   // add data properties to the prototype.
+
+  // As define in MyClassPrototype, the prototype has 1 private slot that we
+  // can use to store any kind of value such as :
+  JS::SetReservedSlot(protoObj, 0, JS::NumberValue(42));
+  // or you can store your uninterpreted pointer:
+  JS::SetReservedSlot(protoObj, 0, JS::PrivateValue(nullptr));
 
   return true;
 }
