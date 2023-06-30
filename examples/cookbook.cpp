@@ -819,7 +819,7 @@ static bool MyClassConstructor(JSContext* cx, unsigned argc, JS::Value* vp) {
 
 static bool DefineMyClass(JSContext* cx, JS::HandleObject global) {
   JS::RootedObject protoObj(
-      cx, JS_InitClass(cx, global, nullptr, &myClass,
+      cx, JS_InitClass(cx, global, nullptr, nullptr, myClass.name,
                        // native constructor function and min arg count
                        MyClassConstructor, 2,
 
