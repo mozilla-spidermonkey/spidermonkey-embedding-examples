@@ -21,6 +21,8 @@ passed, the prototype object will be a plain JS object.
 This is a non-exhaustive list of minor API changes and renames.
 
 - `JS::ModuleInstantiate` → `JS::ModuleLink`
+- `mozilla::Tuple` → `std::tuple` (`<mozilla/Tuple.h>` is removed, use
+  the standard C++ header `<tuple>` instead)
 
 ## ESR 91 to ESR 102 ##
 
