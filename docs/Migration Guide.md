@@ -5,6 +5,21 @@ of SpiderMonkey to the next ESR version.
 
 ## ESR 102 to ESR 115 ##
 
+### More Versatile `JS_InitClass` ###
+
+In previous versions of SpiderMonkey, the name of the constructor
+function added by `JS_InitClass` was always the name of the prototype
+object's `JSClass`.
+This limitation caused the instances and the prototype to always share
+the same `JSClass` and `JSClassOps` specification.
+If the prototype should behave differently than the instances, custom
+checks were needed.
+Now `JS_InitClass` accepts a `const char *` parameter for naming the
+constructor function, so a different `JSClass *` can be used for the
+prototype object.
+If `nullptr` is passed, the prototype object will be a plain JS object.
+See [this patch from bug 1808171](https://hg.mozilla.org/releases/mozilla-esr115/rev/15e1e69037e370750f704d97d631e23ef32f3812).
+
 ### Various API changes ###
 
 This is a non-exhaustive list of minor API changes and renames.
