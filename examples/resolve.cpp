@@ -72,16 +72,6 @@ class Crc {
     return JS::GetMaybePtrFromReservedSlot<Crc>(obj, CrcSlot);
   }
 
-  static bool isPrototype(JSObject* obj) { return getPriv(obj) == nullptr; }
-
-  static bool checkIsInstance(JSContext* cx, JSObject* obj, const char* what) {
-    if (isPrototype(obj)) {
-      JS_ReportErrorASCII(cx, "can't %s on Crc.prototype", what);
-      return false;
-    }
-    return true;
-  }
-
   static bool constructor(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
@@ -106,7 +96,6 @@ class Crc {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject thisObj(cx);
     if (!args.computeThis(cx, &thisObj)) return false;
-    if (!checkIsInstance(cx, thisObj, "call update()")) return false;
     return getPriv(thisObj)->updateImpl(cx, args);
   }
 
@@ -114,18 +103,12 @@ class Crc {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject thisObj(cx);
     if (!args.computeThis(cx, &thisObj)) return false;
-    if (!checkIsInstance(cx, thisObj, "read checksum")) return false;
     return getPriv(thisObj)->getChecksumImpl(cx, args);
   }
 
   static bool newEnumerate(JSContext* cx, JS::HandleObject obj,
                            JS::MutableHandleIdVector properties,
                            bool enumerableOnly) {
-    // We only want to enumerate if obj is the prototype. For instances, we
-    // should return immediately, and this will be called again on the
-    // prototype.
-    if (!isPrototype(obj)) return true;
-
     jsid idUpdate =
         JS::PropertyKey::fromPinnedString(JS_AtomizeAndPinString(cx, "update"));
     if (!properties.append(idUpdate)) return false;
@@ -139,13 +122,6 @@ class Crc {
 
   static bool resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                       bool* resolved) {
-    // We only want to resolve if obj is the prototype. For instances, we should
-    // return immediately, and this will be called again on the prototype.
-    if (!isPrototype(obj)) {
-      *resolved = false;
-      return true;
-    }
-
     if (!id.isString()) {
       *resolved = false;
       return true;
@@ -217,9 +193,13 @@ class Crc {
     JS::RootedObject proto(
         cx, JS_InitClass(cx,
                          global,   // the object in which to define the class
+                         nullptr,  // the prototype object, Crc.prototype
+                                   // (in our case, a plain JS object
+                                   // because calling "Crc.prototype.update"
+                                   // does not make sense)
                          nullptr,  // the prototype of the parent class
-                                   // (in our case, no parent class)
-                         &Crc::klass,  // the JSClass defined above
+                                   // (in our case, Object.prototype)
+                         Crc::klass.name, // "Crc", the constructor name
                          &Crc::constructor,
                          0,  // constructor and num. args
                          // The four nullptrs below are for arrays where you
