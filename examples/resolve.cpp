@@ -96,6 +96,7 @@ class Crc {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject thisObj(cx);
     if (!args.computeThis(cx, &thisObj)) return false;
+    if (!JS_InstanceOf(cx, thisObj, &Crc::klass, &args)) return false;
     return getPriv(thisObj)->updateImpl(cx, args);
   }
 
@@ -103,6 +104,7 @@ class Crc {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject thisObj(cx);
     if (!args.computeThis(cx, &thisObj)) return false;
+    if (!JS_InstanceOf(cx, thisObj, &Crc::klass, &args)) return false;
     return getPriv(thisObj)->getChecksumImpl(cx, args);
   }
 
