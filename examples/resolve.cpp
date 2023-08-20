@@ -192,28 +192,21 @@ class Crc {
  public:
   static bool DefinePrototype(JSContext* cx) {
     JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
-    JS::RootedObject proto(
-        cx, JS_InitClass(cx,
-                         global,   // the object in which to define the class
-                         nullptr,  // the prototype object, Crc.prototype
-                                   // (in our case, a plain JS object
-                                   // because calling "Crc.prototype.update"
-                                   // does not make sense)
-                         nullptr,  // the prototype of the parent class
-                                   // (in our case, Object.prototype)
-                         Crc::klass.name, // "Crc", the constructor name
-                         &Crc::constructor,
-                         0,  // constructor and num. args
-                         // The four nullptrs below are for arrays where you
-                         // would list predefined (not lazy) methods and
-                         // properties, static and non-static
-                         nullptr, nullptr, nullptr, nullptr));
-    if (!proto) return false;
-
-    // Here's how we tell the prototype apart from instances. The private
-    // pointer will be null.
-    JS::SetReservedSlot(proto, CrcSlot, JS::UndefinedValue());
-    return true;
+    return JS_InitClass(cx,
+                        global,   // the object in which to define the class
+                        nullptr,  // the prototype object, Crc.prototype
+                                  // (in our case, a plain JS object because
+                                  // calling "Crc.prototype.update" does not
+                                  // make sense)
+                        nullptr,  // the prototype of the parent class (in our
+                                  // case, Object.prototype)
+                        Crc::klass.name,  // "Crc", the constructor name
+                        &Crc::constructor,
+                        0,  // constructor and num. args
+                        // The four nullptrs below are for arrays where you
+                        // would list predefined (not lazy) methods and
+                        // properties, static and non-static
+                        nullptr, nullptr, nullptr, nullptr);
   }
 };
 constexpr JSClassOps Crc::classOps;
