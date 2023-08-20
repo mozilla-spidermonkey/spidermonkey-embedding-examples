@@ -106,7 +106,7 @@ static bool ModuleExample(JSContext* cx) {
   }
 
   // Resolve imports by loading and compiling additional scripts.
-  if (!JS::ModuleInstantiate(cx, mod)) {
+  if (!JS::ModuleLink(cx, mod)) {
     boilerplate::ReportAndClearException(cx);
     return false;
   }

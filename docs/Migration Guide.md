@@ -3,6 +3,14 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
+## ESR 102 to ESR 115 ##
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS::ModuleInstantiate` → `JS::ModuleLink`
+
 ## ESR 91 to ESR 102 ##
 
 ### Object private pointers ###
