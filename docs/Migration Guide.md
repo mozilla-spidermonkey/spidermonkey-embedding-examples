@@ -20,6 +20,20 @@ prototype object.
 If `nullptr` is passed, the prototype object will be a plain JS object.
 See [this patch from bug 1808171](https://hg.mozilla.org/releases/mozilla-esr115/rev/15e1e69037e370750f704d97d631e23ef32f3812).
 
+### Bound Function Objects ###
+
+Bound function objects (callable functions created with
+`Function.prototype.bind()`) are no longer `JSFunction` objects.
+`JS::GetBuiltinClass()` will not return `js::ESClass::Function` for such
+objects.
+
+Unless you are using `JS::GetBuiltinClass()` to determine whether an
+object is callable, you will most likely not have to migrate anything.
+Consider using `JS::IsCallable()`.
+
+If you need to check whether an object is specifically a bound function
+object, use `JS_ObjectIsBoundFunction()`.
+
 ### Various API changes ###
 
 This is a non-exhaustive list of minor API changes and renames.
