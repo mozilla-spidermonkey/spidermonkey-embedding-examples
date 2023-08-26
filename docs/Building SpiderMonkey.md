@@ -20,15 +20,7 @@ Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
 At the time of writing, the latest source for Firefox ESR 115, which
 contains the source for SpiderMonkey ESR 115, can be found here:
-https://ftp.mozilla.org/pub/firefox/releases/115.0esr/source/
-
-This version may be broken by compiler optimizations using 32-byte or wider
-vector store instructions, so you need to either disable these optimizations
-(for example, on x86-64 do not enable AVX), or patch the 115.0 source with
-the fixes for the following bug:
-
- - [`js_new<JSRuntime>` allocates memory block not satisfying
-   `alignof(JSRuntime)`](https://bugzilla.mozilla.org/show_bug.cgi?id=1841040)
+https://ftp.mozilla.org/pub/firefox/releases/115.1.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
