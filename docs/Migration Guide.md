@@ -41,6 +41,10 @@ This is a non-exhaustive list of minor API changes and renames.
 - `JS::ModuleInstantiate` → `JS::ModuleLink`
 - `mozilla::Tuple` → `std::tuple` (`<mozilla/Tuple.h>` is removed, use
   the standard C++ header `<tuple>` instead)
+- `mozilla::IsFinite()` → `std::isfinite()`
+- `mozilla::IsNaN()` → `std::isnan()`
+- Script filenames are now always encoded as UTF-8, see
+  [this patch from bug 1492090](https://hg.mozilla.org/releases/mozilla-esr115/rev/416af93c3205460856a2cae7bee084a656ee2ee9)
 
 ## ESR 91 to ESR 102 ##
 
