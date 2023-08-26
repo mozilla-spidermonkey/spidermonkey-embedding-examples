@@ -4,15 +4,20 @@ Use these instructions to build your own copy of SpiderMonkey.
 
 ## Prerequisites ##
 
-You will need a **C++ compiler** that can handle the C++17 standard, **Rust**
-version 1.66 or later, **GNU Make**, **zlib**, and **libffi**.
+You will need a **C++ compiler** that can handle the C++17 standard,
+**Rust** version [1.66][minimum-rust-version] or later, **GNU Make**,
+**zlib**, and **libffi**.
 These can usually be installed with a package manager.
 
-> **NOTE** SpiderMonkey also requires ICU of at least version 73.1, but
-> it will build a bundled copy by default.
+> **NOTE** SpiderMonkey also requires ICU of at least version
+> [73.1][minimum-icu-version], but it will build a bundled copy by
+> default.
 > If you have a new enough copy installed on your system, you can add
 > `--with-system-icu` in the build instructions below, for a shorter
 > build time.
+
+[minimum-rust-version]: https://searchfox.org/mozilla-esr115/rev/61b47de1faebf23626e519b2464b461589fbea3e/python/mozboot/mozboot/util.py#14
+[minimum-icu-version]: https://searchfox.org/mozilla-esr115/rev/61b47de1faebf23626e519b2464b461589fbea3e/js/moz.configure#1107
 
 ## Getting the source code ##
 
