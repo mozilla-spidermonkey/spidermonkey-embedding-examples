@@ -2,8 +2,10 @@
 #include <string>
 
 #include <jsapi.h>
+#include <jsfriendapi.h>
 
 #include <js/CompilationAndEvaluation.h>
+#include <js/Initialization.h>
 #include <js/Modules.h>
 #include <js/SourceText.h>
 
@@ -76,6 +78,13 @@ static JSObject* ExampleResolveHook(JSContext* cx,
     }
   }
 
+  if (filename == u"b") {
+    mod = CompileExampleModule(cx, "b", "export const C2 = 2;");
+    if (!mod) {
+      return nullptr;
+    }
+  }
+
   // Register result in table.
   if (mod) {
     moduleRegistry.emplace(filename, JS::PersistentRootedObject(cx, mod));
@@ -86,7 +95,43 @@ static JSObject* ExampleResolveHook(JSContext* cx,
   return nullptr;
 }
 
+// Callback for embedding to implement an asynchronous dynamic import. This must
+// do the same thing as the module resolve hook, but also link and evaluate the
+// module, and it must always call JS::FinishDynamicModuleImport when done.
+static bool ExampleDynamicImportHook(JSContext* cx,
+                                     JS::Handle<JS::Value> referencingPrivate,
+                                     JS::Handle<JSObject*> moduleRequest,
+                                     JS::Handle<JSObject*> promise) {
+  JS::Rooted<JSObject*> mod{
+      cx, ExampleResolveHook(cx, referencingPrivate, moduleRequest)};
+  if (!mod || !JS::ModuleLink(cx, mod)) {
+    return JS::FinishDynamicModuleImport(cx, nullptr, referencingPrivate,
+                                         moduleRequest, promise);
+  }
+
+  JS::Rooted<JS::Value> rval{cx};
+  if (!JS::ModuleEvaluate(cx, mod, &rval)) {
+    return JS::FinishDynamicModuleImport(cx, nullptr, referencingPrivate,
+                                         moduleRequest, promise);
+  }
+  if (rval.isObject()) {
+    JS::Rooted<JSObject*> evaluationPromise{cx, &rval.toObject()};
+    return JS::FinishDynamicModuleImport(
+      cx, evaluationPromise, referencingPrivate, moduleRequest, promise);
+  }
+  return JS::FinishDynamicModuleImport(cx, nullptr, referencingPrivate,
+                                       moduleRequest, promise);
+}
+
 static bool ModuleExample(JSContext* cx) {
+  // In order to use dynamic imports, we need a job queue. We can use the
+  // default SpiderMonkey job queue for this example, but a more sophisticated
+  // embedding would use a custom job queue to schedule its own tasks.
+  if (!js::UseInternalJobQueues(cx)) return false;
+
+  // We must instantiate self-hosting *after* setting up job queue.
+  if (!JS::InitSelfHostedCode(cx)) return false;
+
   JS::RootedObject global(cx, boilerplate::CreateGlobal(cx));
   if (!global) {
     return false;
@@ -95,11 +140,17 @@ static bool ModuleExample(JSContext* cx) {
   JSAutoRealm ar(cx, global);
 
   // Register a hook in order to provide modules
-  JS::SetModuleResolveHook(JS_GetRuntime(cx), ExampleResolveHook);
+  JSRuntime* rt = JS_GetRuntime(cx);
+  JS::SetModuleResolveHook(rt, ExampleResolveHook);
+  JS::SetModuleDynamicImportHook(rt, ExampleDynamicImportHook);
 
   // Compile the top module.
-  JS::RootedObject mod(
-      cx, CompileExampleModule(cx, "top", "import {C1} from 'a';"));
+  static const char top_module_source[] = R"js(
+    import {C1} from 'a';
+    const {C2} = await import('b');
+  )js";
+  JS::Rooted<JSObject*> mod{cx,
+                            CompileExampleModule(cx, "top", top_module_source)};
   if (!mod) {
     boilerplate::ReportAndClearException(cx);
     return false;
@@ -120,11 +171,22 @@ static bool ModuleExample(JSContext* cx) {
     return false;
   }
 
+  js::RunJobs(cx);
+  if (rval.isObject()) {
+    JS::Rooted<JSObject*> evaluationPromise{cx, &rval.toObject()};
+    if (!JS::ThrowOnModuleEvaluationFailure(
+            cx, evaluationPromise,
+            JS::ModuleErrorBehaviour::ThrowModuleErrorsSync)) {
+      boilerplate::ReportAndClearException(cx);
+      return false;
+    }
+  }
+
   return true;
 }
 
 int main(int argc, const char* argv[]) {
-  if (!boilerplate::RunExample(ModuleExample)) {
+  if (!boilerplate::RunExample(ModuleExample, /* initSelfHosting = */ false)) {
     return 1;
   }
   return 0;
