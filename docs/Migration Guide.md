@@ -5,11 +5,46 @@ of SpiderMonkey to the next ESR version.
 
 ## ESR 102 to ESR 115 ##
 
+### More Versatile `JS_InitClass` ###
+
+In previous versions of SpiderMonkey, the name of the constructor
+function added by `JS_InitClass` was always the name of the prototype
+object's `JSClass`.
+This limitation caused the instances and the prototype to always share
+the same `JSClass` and `JSClassOps` specification.
+If the prototype should behave differently than the instances, custom
+checks were needed.
+Now `JS_InitClass` accepts a `const char *` parameter for naming the
+constructor function, so a different `JSClass *` can be used for the
+prototype object.
+If `nullptr` is passed, the prototype object will be a plain JS object.
+See [this patch from bug 1808171](https://hg.mozilla.org/releases/mozilla-esr115/rev/15e1e69037e370750f704d97d631e23ef32f3812).
+
+### Bound Function Objects ###
+
+Bound function objects (callable functions created with
+`Function.prototype.bind()`) are no longer `JSFunction` objects.
+`JS::GetBuiltinClass()` will not return `js::ESClass::Function` for such
+objects.
+
+Unless you are using `JS::GetBuiltinClass()` to determine whether an
+object is callable, you will most likely not have to migrate anything.
+Consider using `JS::IsCallable()`.
+
+If you need to check whether an object is specifically a bound function
+object, use `JS_ObjectIsBoundFunction()`.
+
 ### Various API changes ###
 
 This is a non-exhaustive list of minor API changes and renames.
 
 - `JS::ModuleInstantiate` → `JS::ModuleLink`
+- `mozilla::Tuple` → `std::tuple` (`<mozilla/Tuple.h>` is removed, use
+  the standard C++ header `<tuple>` instead)
+- `mozilla::IsFinite()` → `std::isfinite()`
+- `mozilla::IsNaN()` → `std::isnan()`
+- Script filenames are now always encoded as UTF-8, see
+  [this patch from bug 1492090](https://hg.mozilla.org/releases/mozilla-esr115/rev/416af93c3205460856a2cae7bee084a656ee2ee9)
 
 ## ESR 91 to ESR 102 ##
 

@@ -4,36 +4,28 @@ Use these instructions to build your own copy of SpiderMonkey.
 
 ## Prerequisites ##
 
-You will need a **C++ compiler** that can handle the C++17 standard, **Rust**
-version 1.59 or later, **GNU Make**, **zlib**, and **libffi**.
+You will need a **C++ compiler** that can handle the C++17 standard,
+**Rust** version [1.66][minimum-rust-version] or later, **GNU Make**,
+**zlib**, and **libffi**.
 These can usually be installed with a package manager.
-You will also need **Autoconf 2.13** (not any later version) which is
-also usually available through a package manager.
-The package will usually be called something like `autoconf2.13` rather
-than just `autoconf`.
 
-> **NOTE** SpiderMonkey also requires ICU of at least version 71.1, but
-> it will build a bundled copy by default.
+> **NOTE** SpiderMonkey also requires ICU of at least version
+> [73.1][minimum-icu-version], but it will build a bundled copy by
+> default.
 > If you have a new enough copy installed on your system, you can add
 > `--with-system-icu` in the build instructions below, for a shorter
 > build time.
+
+[minimum-rust-version]: https://searchfox.org/mozilla-esr115/rev/61b47de1faebf23626e519b2464b461589fbea3e/python/mozboot/mozboot/util.py#14
+[minimum-icu-version]: https://searchfox.org/mozilla-esr115/rev/61b47de1faebf23626e519b2464b461589fbea3e/js/moz.configure#1107
 
 ## Getting the source code ##
 
 Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
-At the time of writing, the latest source for Firefox ESR 102, which
-contains the source for SpiderMonkey ESR 102, can be found here:
-https://ftp.mozilla.org/pub/firefox/releases/102.1.0esr/source/
-
-This version is broken for embedder builds so you will need to either
-wait for version 102.2.0 or patch the 102.1.0 source with the fixes for
-the following bugs:
-
- - [1776254 - Cannot build library for SM embedding examples, missing
-   ProfilingCategoryList.h](https://bugzilla.mozilla.org/show_bug.cgi?id=1776254)
- - [1780857 - Embedder build broken in js/public/Debug.h if DEBUG not
-   defined](https://bugzilla.mozilla.org/show_bug.cgi?id=1780857)
+At the time of writing, the latest source for Firefox ESR 115, which
+contains the source for SpiderMonkey ESR 115, can be found here:
+https://ftp.mozilla.org/pub/firefox/releases/115.1.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
