@@ -47,8 +47,6 @@ writable to you without superuser permissions, for example.
 
 ```sh
 cd js/src
-cp ./configure.in ./configure
-chmod +x ./configure
 mkdir _build
 cd _build
 ../configure --disable-jemalloc --with-system-zlib \
@@ -57,19 +55,21 @@ make
 make install  # sudo if necessary
 ```
 
-Add `--prefix=/my/prefix` (where `/my/prefix` is your chosen prefix) to
-the `configure` line if you chose a different prefix.
+Add `--prefix=/my/installation/dir` to the `configure` line if you chose
+a different installation location.
+(Where `/my/installation/dir` is your chosen location: for example,
+`--prefix=/opt/spidermonkey`.)
 
 If you are building a package for production, omit the `--enable-debug`.
 
-If you picked a different prefix to install into, and that prefix is not
-a standard place where libraries are loaded from, you may need to
+If you picked a different location to install into, and that location is
+not a standard place where libraries are loaded from, you may need to
 execute the following when you want to use the SpiderMonkey libraries,
 for example when building the examples from this repository.
 
 ```sh
-export PKG_CONFIG_PATH=/my/prefix/lib/pkgconfig
-export LD_LIBRARY_PATH=/my/prefix/lib
+export PKG_CONFIG_PATH=/my/installation/dir/lib/pkgconfig
+export LD_LIBRARY_PATH=/my/installation/dir/lib
 ```
 
 ### Disabling jemalloc ###
