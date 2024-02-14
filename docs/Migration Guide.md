@@ -689,3 +689,255 @@ This is a non-exhaustive list of minor API changes and renames.
 - `JS::FormatStackDump()` has removed its input buffer parameter.
 - `JS::GCForReason()` → `JS::NonIncrementalGC()`
 - `JS::GCPolicy<T>::initial()` → `JS::SafelyInitialized<T>`
+
+## ESR 10 to 17 ##
+
+At this time the JSAPI was still being documented in MDN.
+Viewing the pages on archive.org may give more details.
+[This](https://web.archive.org/web/20200424132803/https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/JSAPI_reference)
+is the last available snapshot, but older snapshots may be useful as
+well.
+
+### Headers ###
+
+The write barrier API (`JS_RegisterReference()`, `JS_ModifyReference()`,
+etc.) has moved from `jsapi.h` to `jsfriendapi.h`.
+
+### C++ ###
+
+At this point in SpiderMonkey's history, its headers could be compiled
+as either C or C++.
+There are a number of newer APIs behind an `#ifdef __cplusplus`, such as
+`JS::Value` and the Handle APIs.
+
+**Recommendation:**
+If your codebase is in C, migrate it to C++.
+That will have to happen eventually anyway, as the C API gets removed in
+a future version.
+Migrating now will allow any new code that's being written to opt-in to
+future-proof APIs such as `JS::Value`.
+
+### Types ###
+
+Mozilla's custom integer types (`uint8`, `int32`, `JSUint64`, etc.) are
+deprecated, although still present in ESR 17.
+The standard types from `<stdint.h>` are preferred.
+
+Other types have been removed in favour of plain C types:
+- `intN` → `int`
+- `jsdouble` → `double`
+- `jsint` → `int`
+- `jsrefcount` → `unsigned`
+- `jsuint` → `unsigned`
+- `jsuword` → `uintptr_t`
+- `jsword` → `intptr_t`
+- `uintN` → `unsigned`
+
+**Recommendation:**
+Replace all occurrences of these types.
+
+### Access from other threads ###
+
+The `JS_THREADSAFE` build option is permanently turned on, meaning that
+JS APIs cannot be accessed from arbitrary threads.
+If your embedding relied on this, the code will probably need some
+refactoring.
+
+APIs having to do with multi-threaded JS runtimes have all been removed:
+- `JS_ClearContextThread()`
+- `JS_GetContextThread()`
+- `JS_Lock()`
+- `JS_SetContextThread()`
+- `JS_Unlock()`
+
+### JSClass ###
+
+In this version there were several changes in the `JSClass` struct and
+its associated operations.
+
+First of all, some of the members were reordered.
+Hopefully any affected code would fail to compile with the new ESR, but
+it's probably good to check all your `JSClass` definitions anyway.
+
+The `JSClass.xdrObject` member was removed.
+It's likely that embedders were already not using JSXDR and were already
+setting this member to null.
+If you used this API, you may have to look for a custom solution.
+
+Previously, a `JSClass` could provide either a `JSMarkOp` or `JSTraceOp`
+function pointer as the `JSClass.mark` member.
+The `JSCLASS_MARK_IS_TRACE` flag was used to indicate which one it was,
+and therefore how the function pointer would be called.
+The member has been renamed to `JSClass.trace`, and `JSMarkOp` has been
+removed, as well as `JSCLASS_MARK_IS_TRACE`.
+
+If you had any `JSClass` with a non-null `mark` member that _didn't_ use
+`JSCLASS_MARK_IS_TRACE`, you must rewrite the mark operation as a trace
+operation.
+In most cases this should consist of a pretty straightforward
+replacement of `JS_MarkGCThing()` with `JS_CALL_TRACER()` and updating
+the function signature.
+An example is
+[here](https://bugzilla.mozilla.org/attachment.cgi?id=516449&action=diff#a/js/src/shell/js.cpp_sec2).
+
+Several other `JSClass` operations, such as `JSPropertyOp`, changed
+their signatures to take Handles instead of pointers.
+Handles are part of the C++ API, although there are some alternate
+[typedefs](https://searchfox.org/mozilla-esr17/source/js/src/jsapi.h#1650)
+for use in the C API.
+
+You will need to update the signatures of the class operations to match
+the new definitions.
+The definition of `JSPropertyOp`, for example, changed as follows:
+
+```c++
+// old
+typedef JSBool (*JSPropertyOp)(JSContext*, JSObject*, jsid, jsval*);
+// new
+typedef JSBool (*JSPropertyOp)(JSContext*, JSHandleObject, JSHandleId, JSMutableHandleValue);
+```
+
+If you are using C++ (recommended), you may need to use the Handle's
+`get()` or `address()` methods if you need access to the underlying
+GC-rooted thing, and `set()` if you need to set the value in a mutable
+Handle.
+For embeddings that still use C, use the `._` member of the ersatz
+Handle typedef or just cast the Handle to a pointer to the underlying
+GC thing, which should share the same memory layout (e.g. `(JSObject**)`
+for `JSHandleObject`).
+
+`JSFinalizeOp`'s `JSContext*` parameter was replaced with a `JSFreeOp*`
+parameter.
+This is normally not used by embeddings.
+
+There are some other minor removals listed below in the "Various API
+changes" section.
+
+**Recommendations:**
+- Double-check your `JSClass` definitions to make sure the members
+  match the new order.
+- Remove any usage of `JSCLASS_MARK_IS_TRACE`.
+- If you have any `JSMarkOp` functions, port them to match the signature
+  of `JSTraceOp`.
+- Update signatures of other class operations where needed, to use the
+  Handle API.
+
+### E4X ###
+
+E4X support (inline XML in JS) is being phased out at this point.
+If your code uses E4X, you'll need to pass `JSOPTION_ALLOW_XML` and 
+possibly `JSOPTION_MOAR_XML` to `JS_SetOptions()` in order for it to
+keep working.
+
+However, E4X is a dead end in terms of standardization, and is removed
+altogether in the very next version of SpiderMonkey, so the
+recommendation is to migrate your code not to use it.
+There isn't a one-size-fits-all replacement; some options are
+transpilation, parsing the XML from a string, and writing new APIs that
+take plain objects.
+
+### GC callbacks ###
+
+The old GC callback API has been split up.
+GC callbacks are now called only when GC begins and ends, and is passed
+a `JSGCStatus` value of `JSGC_BEGIN` or `JSGC_END`.
+For the finalize phase, there is a separate callback API that is set
+with `JS_SetFinalizeCallback()`, and is passed a `JSFinalizeStatus`
+value of `JSFINALIZE_START` or `JSFINALIZE_END`.
+This replaces the old `JSGCStatus` values of `JSGC_MARK_END` and
+`JSGC_FINALIZE_END`.
+
+`JS_SetGCCallback()` and `JS_SetGCCallbackRT()` have been combined into
+a single `JS_SetGCCallback()` API that takes `JSRuntime*` instead of
+`JSContext*`.
+
+**Recommendation:**
+If your GC callback performed any actions on `JSGC_MARK_END` or
+`JSGC_FINALIZE_END`, you'll need to split that code out into a separate
+finalize callback.
+You may need to fix up some API calls that take `JSRuntime*` instead of
+`JSContext*` (see also "Various API changes" below).
+Use `JS_GetRuntime()` or `JS_GetObjectRuntime()` if you don't have a
+pointer to the runtime already.
+
+### Various API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS_BufferIsCompilableUnit()` gets a boolean "bytes are UTF-8"
+  argument in position 2.
+  Previously, the bytes were not treated as UTF-8.
+- `JS_CompileFile()` → `JS_CompileUTF8File()`
+- `JS_CompileFileHandle()` → `JS_CompileUTF8FileHandle()`
+- `JS_CompileFileHandleForPrinicpals()` →
+  `JS_CompileUTF8FileHandleForPrincipals()`
+- `JS_CompileFileHandleForPrinicpalsVersion()` →
+  `JS_CompileUTF8FileHandleForPrincipalsVersion()`
+- Several APIs now take a `JSRuntime*` instead of a `JSContext*`:
+  - `JS_CompartmentGC()`
+  - `JS_DumpHeap()`
+  - `JS_GC()`
+  - `JS_IsInRequest()`
+  - `JS_SetNativeStackQuota()`
+  - `JS_TracerInit()`
+- Several APIs no longer take a `JSContext*` as the first argument:
+  - `JS_GetClass()`
+  - `JS_GetCompartmentPrivate()`
+  - `JS_GetParent()`
+  - `JS_GetPrivate()`
+  - `JS_GetPrototype()`
+  - `JS_GetReservedSlot()`
+  - `JS_IsAboutToBeFinalized()`
+  - `JS_SetCompartmentPrivate()`
+  - `JS_SetPrivate()`
+  - `JS_SetReservedSlot()`
+- `JSIdArray` is now opaque.
+  Instead of accessing the `.length` and `.vector` members, use
+  `JS_IdArrayLength()` and `JS_IdArrayGet()`.
+- `JS_NewCompartmentAndGlobalObject()` → `JS_NewGlobalObject()`
+- `JS_NewObjectForConstructor()` now takes an additional `JSClass*`
+  argument.
+- `JS_Remove___Root()` functions no longer have a return value.
+- `JSTraceCallback` is passed a `void**` pointer to the traced pointer,
+  instead of the `void*` pointer itself.
+
+The following APIs have been removed.
+
+- `JSCLASS_CONCURRENT_FINALIZER`: objects with finalize hooks are never
+  finalized on a background thread anymore.
+- `JSCLASS_CONSTRUCT_PROTOTYPE`: this flag caused a class's constructor
+  to be called once on its prototype object.
+  If you need to do any initialization on the prototype object, do it
+  after initializing the class instead. 
+- `JS_ConstructObject()` and `JS_ConstructObjectWithArguments()`: use
+  `JS_New()` instead, and pass a pointer to the constructor object.
+  The old APIs would malfunction if the constructor was no longer
+  reachable from the global object.
+- `JS_DestroyContextMaybeGC()`: use either `JS_DestroyContext()` or
+  `JS_DestroyContextNoGC()`.
+- `JSFinalizeStub`: use null instead.
+  (Despite the comment in `jsapi.h` that says `JSClass.finalize` must
+  not be null!)
+- `JS_FlushCaches()`: no replacement.
+- `JS_GET_CLASS` macro: use `JS_GetClass()` instead.
+- `JS_IsConstructing_PossiblyWithGivenThisObject()`: once no longer
+  using `JS_ConstructObject()` and `JSCLASS_CONSTRUCT_PROTOTYPE`, this
+  can be replaced with `JS_IsConstructing()`.
+- `JS_IsScriptFrame()`: can be replaced by `JS_GetFrameScript()` which
+  returns null if the frame is not a script frame.
+- `JS::MarkRuntime()`: this was an internal function and was unlikely to
+  be used by embeddings.
+- `JS_NewNumberValue()`: use `JS_NumberValue()` instead, but note that
+  the semantics are slightly different: it canonicalizes NaN, and it
+  cannot fail.
+- `JSOPTION_JIT`, `JSOPTION_PROFILING`: no replacement.
+- `JSOPTION_SOFTEN`: Use `JS_SetJitHardening()` instead.
+- The `JSPD_ARGUMENT` flag for property descriptors: in ESR 17 you can
+  assume that it's always set.
+- `JS_SetThreadStackLimit()`: use `JS_SetNativeStackQuota()` instead.
+- `JSVAL_IS_OBJECT()`: a drop-in replacement is
+  `JSVAL_IS_NULL(v) || !JSVAL_IS_PRIMITIVE(v)`, but the long-term
+  recommendation is to migrate to the C++ `JS::Value` API (see above.)
+  Note that `JSVAL_IS_OBJECT()` corresponds to
+  `JS::Value::isObjectOrNull()`, not `JS::Value::isObject()`.
+- `JS::Value::setObjectOrUndefined()`: open-code this if you need it.
