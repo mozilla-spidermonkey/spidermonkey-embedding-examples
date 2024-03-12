@@ -57,3 +57,7 @@ in the `meson.build` file, and add a description of it to this
   Use this in cases where defining properties and methods in your class
   upfront might be slow.
 - **modules.cpp** - Example of how to load ES Module sources.
+- **worker.cpp** - Example of how to use SpiderMonkey in multiple threads.
+- **stencils.cpp** - Example of how to use Stencils to cache and reuse
+  compiled scripts. The example demonstrates Stencils in multiple threads.
+
