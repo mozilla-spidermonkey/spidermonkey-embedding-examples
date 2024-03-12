@@ -7,7 +7,7 @@ cxx = meson.get_compiler('cpp')
 args = []
 
 zlib = dependency('zlib')  # (is already a SpiderMonkey dependency)
-spidermonkey = dependency('mozjs-115')
+spidermonkey = dependency('mozjs-124a1')
 readline = cxx.find_library('readline')
 
 # Check if SpiderMonkey was compiled with --enable-debug. If this is the case,
@@ -72,3 +72,5 @@ executable('tracing', 'examples/tracing.cpp', 'examples/boilerplate.cpp', depend
 executable('resolve', 'examples/resolve.cpp', 'examples/boilerplate.cpp', dependencies: [spidermonkey, zlib])
 executable('modules', 'examples/modules.cpp', 'examples/boilerplate.cpp', dependencies: [spidermonkey])
 executable('worker', 'examples/worker.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
+executable('stencils', 'examples/stencils.cpp', 'examples/boilerplate.cpp', dependencies: spidermonkey)
+
