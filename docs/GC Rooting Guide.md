@@ -42,33 +42,11 @@ if it were the underlying pointer.
 
 `JS::Rooted` must be constructed with a `JSContext*`, and optionally an initial value.
 
-There are typedefs available for the main types.
-Within SpiderMonkey, it is suggested that these are used in preference
-to the template class (Gecko uses the template versions):
+There are typedefs available for the main types, though they are now
+deprecated in both Gecko and SpiderMonkey. If you see eg `JS::RootedObject`,
+it is an alias for `JS::Rooted<JSObject*>`.
 
-| Template class            | Typedef              |
-| ------------------------- | -------------------- |
-| `JS::Rooted<JS::Value>`   | `JS::RootedValue`    |
-| `JS::Rooted<JSObject*>`   | `JS::RootedObject`   |
-| `JS::Rooted<JSString*>`   | `JS::RootedString`   |
-| `JS::Rooted<JSScript*>`   | `JS::RootedScript`   |
-| `JS::Rooted<jsid>`        | `JS::RootedId`       |
-| `JS::Rooted<JSFunction*>` | `JS::RootedFunction` |
-| `JS::Rooted<JS::Symbol*>` | `JS::RootedSymbol`   |
-
-For example, instead of this:
-
-```c++
-JSObject* localObj = JS_GetObjectOfSomeSort(cx);
-```
-
-You would write this:
-
-```c++
-JS::RootedObject localObj(cx, JS_GetObjectOfSomeSort(cx));
-```
-
-SpiderMonkey makes it easy to remember to use `JS::Rooted<T>` types
+SpiderMonkey makes it easy to remember to use the `JS::Rooted<T>` type
 instead of a raw pointer because all of the API methods that may GC take
 a `JS::Handle<T>`, as described below, and `JS::Rooted<T>` autoconverts
 to `JS::Handle<T>` but a bare pointer does not.
@@ -94,19 +72,6 @@ through an indirect reference.
 Like a reference, a `JS::Handle` is immutable: it can only ever refer to
 the `JS::Rooted<T>` that it was created for.
 
-Similarly to `JS::Rooted<T>`, there are typedefs available for the main
-types:
-
-| Template class            | Typedef              |
-| ------------------------- | -------------------- |
-| `JS::Handle<JS::Value>`   | `JS::HandleValue`    |
-| `JS::Handle<JSObject*>`   | `JS::HandleObject`   |
-| `JS::Handle<JSString*>`   | `JS::HandleString`   |
-| `JS::Handle<JSScript*>`   | `JS::HandleScript`   |
-| `JS::Handle<jsid>`        | `JS::HandleId`       |
-| `JS::Handle<JSFunction*>` | `JS::HandleFunction` |
-| `JS::Handle<JS::Symbol*>` | `JS::HandleSymbol`   |
-
 You should use `JS::Handle<T>` for all function parameters taking GC
 thing pointers (except out-parameters, which are described below).
 For example, instead of:
@@ -122,7 +87,7 @@ You should write:
 
 ```c++
 JSObject*
-someFunction(JSContext* cx, JS::HandleObject obj) {
+someFunction(JSContext* cx, JS::Handle<JSObject*> obj) {
     // ...
 }
 ```
@@ -145,19 +110,6 @@ address-of operator — on a `JS::Rooted<T>` instance.
 `JS::MutableHandle<T>` is exactly like a `JS::Handle<T>` except that it
 adds a `.set(T &t)` method and must be created from a `JS::Rooted<T>`
 explicitly.
-
-There are typedefs for `JS::MutableHandle<T>`, the same as for the other
-templates:
-
-| Template class                   | Typedef                     |
-| -------------------------------- | --------------------------- |
-| `JS::MutableHandle<JS::Value>`   | `JS::MutableHandleValue`    |
-| `JS::MutableHandle<JSObject*>`   | `JS::MutableHandleObject`   |
-| `JS::MutableHandle<JSString*>`   | `JS::MutableHandleString`   |
-| `JS::MutableHandle<JSScript*>`   | `JS::MutableHandleScript`   |
-| `JS::MutableHandle<jsid>`        | `JS::MutableHandleId`       |
-| `JS::MutableHandle<JSFunction*>` | `JS::MutableHandleFunction` |
-| `JS::MutableHandle<JS::Symbol*>` | `JS::MutableHandleSymbol`   |
 
 `JS::MutableHandle<T>` should be used for all out-parameters, for
 example instead of:
@@ -183,7 +135,7 @@ You should write:
 
 ```c++
 bool
-maybeGetValue(JSContext* cx, JS::MutableHandleValue valueOut) {
+maybeGetValue(JSContext* cx, JS::MutableHandle<JS::Value> valueOut) {
     // ...
     if (!wasError)
         valueOut.set(resultValue);
@@ -294,8 +246,6 @@ cannot be used on both the stack and the heap.
 In this case, separate structures must be created for the stack and the
 heap.
 
-There are currently no convenience typedefs for `JS::Heap<T>`.
-
 For example, instead of this:
 
 ```c++
@@ -331,8 +281,8 @@ JSClass FooClass = {
     JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(1),
     &FooClassOps
 };
-JS::RootedObject obj(cx, JS_NewObject(cx, &FooClass));
-JS::RootedValue v(cx, JS::ObjectValue(*otherGCThing));
+JS::Rooted<JSObject*> obj(cx, JS_NewObject(cx, &FooClass));
+JS::Rooted<JS::Value> v(cx, JS::ObjectValue(*otherGCThing));
 js::SetReservedSlot(obj, 0, v);
 ```
 
