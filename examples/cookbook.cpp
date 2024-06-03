@@ -350,32 +350,33 @@ static bool ThrowValue(JSContext* cx, JS::HandleValue exc) {
  * An example use would be to pass the filename and line number in the C++ code
  * instead:
  *
- * return ThrowError(cx, global, message, __FILE__, __LINE__);
+ * return ThrowError(cx, global, message, __FILE__, __LINE__, column);
  */
 static bool ThrowError(JSContext* cx, JS::HandleObject global,
                        const char* message, const char* filename,
-                       int32_t lineno) {
+                       int32_t lineno, int32_t colno = 0) {
   JS::RootedString messageStr(cx, JS_NewStringCopyZ(cx, message));
   if (!messageStr) return false;
   JS::RootedString filenameStr(cx, JS_NewStringCopyZ(cx, filename));
   if (!filenameStr) return false;
 
-  JS::RootedValueArray<3> args(cx);
-  args[0].setString(messageStr);
-  args[1].setString(filenameStr);
-  args[2].setInt32(lineno);
-  JS::RootedValue exc(cx);
-  // The JSAPI code here is actually simulating `throw Error(message)` without
-  // the new, as new is a bit harder to simulate using the JSAPI. In this case,
-  // unless the script has redefined Error, it amounts to the same thing.
-  if (!JS_CallFunctionName(cx, global, "Error", args, &exc)) return false;
+  JS::Rooted<JSObject*> stack(cx);
+  if (!JS::CaptureCurrentStack(cx, &stack)) {
+      return false;
+  }
+
+  JS::Rooted<JS::Value> exc(cx);
+  if (!JS::CreateError(cx, JSEXN_ERR, stack, filenameStr, lineno, colno,
+                       nullptr, messageStr, JS::NothingHandleValue, &exc)) {
+      return false;
+  }
 
   JS_SetPendingException(cx, exc);
   return false;
 }
 
 #define THROW_ERROR(cx, global, message) \
-  ThrowError(cx, global, message, __FILE__, __LINE__)
+    ThrowError(cx, global, message, __FILE__, __LINE__)
 
 ///// `catch` //////////////////////////////////////////////////////////////////
 
