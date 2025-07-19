@@ -1,10 +1,10 @@
 #!/usr/bin/env -S python3 -B
-# coding: utf-8
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-""" Usage: make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE
+
+""" Usage: python make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE
 
     This script generates SpiderMonkey bytecode documentation
     from js/src/vm/Opcodes.h.
@@ -12,11 +12,11 @@
     Output is written to docs/Bytecode.md.
 """
 
-import sys
 import os
+import sys
 from xml.sax.saxutils import escape
 
-SOURCE_BASE = 'https://searchfox.org/mozilla-esr102/source'
+SOURCE_BASE = "https://searchfox.org/mozilla-esr140/source"
 
 FORMAT_TO_IGNORE = {
     "JOF_BYTE",
@@ -37,8 +37,8 @@ FORMAT_TO_IGNORE = {
 def format_format(format):
     format = [flag for flag in format if flag not in FORMAT_TO_IGNORE]
     if len(format) == 0:
-        return ''
-    return '**Format:** {format}\n'.format(format=', '.join(format))
+        return ""
+    return "**Format:** {format}\n".format(format=", ".join(format))
 
 
 def maybe_escape(value, format_str, fallback=""):
@@ -59,34 +59,58 @@ OPCODE_FORMAT = """\
 
 def print_opcode(opcode, out):
     opcodes = [opcode] + opcode.group
-    names = ', '.join(maybe_escape(code.op, "`{}`") for code in opcodes)
+    names = ", ".join(maybe_escape(code.op, "`{}`") for code in opcodes)
     operands = maybe_escape(opcode.operands, "**Operands:** `({})`\n")
     stack_uses = maybe_escape(opcode.stack_uses, "`{}` ")
     stack_defs = maybe_escape(opcode.stack_defs, " `{}`")
     if stack_uses or stack_defs:
-        stack = "**Stack:** {}&rArr;{}\n".format(stack_uses, stack_defs)
+        stack = f"**Stack:** {stack_uses}&rArr;{stack_defs}\n"
     else:
         stack = ""
 
-    print(OPCODE_FORMAT.format(
-        id=opcodes[0].op,
-        names=names,
-        operands=operands,
-        stack=stack,
-        desc=opcode.desc,
-        format=format_format(opcode.format_),
-    ), file=out)
+    print(
+        OPCODE_FORMAT.format(
+            id=opcodes[0].op,
+            names=names,
+            operands=operands,
+            stack=stack,
+            desc=opcode.desc,
+            format=format_format(opcode.format_),
+        ),
+        file=out,
+    )
 
 
 id_cache = dict()
 id_count = dict()
 
 
+def make_element_id(category, type=""):
+    key = f"{category}:{type}"
+    if key in id_cache:
+        return id_cache[key]
+
+    if type == "":
+        id = category.replace(" ", "_")
+    else:
+        id = type.replace(" ", "_")
+
+    if id in id_count:
+        id_count[id] += 1
+        id = f"{id}_{id_count[id]}"
+    else:
+        id_count[id] = 1
+
+    id_cache[key] = id
+    return id
+
+
 def print_doc(index, out):
-    print("""# Bytecode Listing #
+    print(
+        f"""# Bytecode Listing #
 
 This document is automatically generated from
-[`Opcodes.h`]({source_base}/js/src/vm/Opcodes.h) by
+[`Opcodes.h`]({SOURCE_BASE}/js/src/vm/Opcodes.h) by
 [`make_opcode_doc.py`](../tools/make_opcode_doc.py).
 
 ## Background ##
@@ -120,22 +144,26 @@ pushed onto the expression stack.
 All bytecodes implicitly operate in terms of this location.
 
 
-""".format(source_base=SOURCE_BASE), file=out)
+""",
+        file=out,
+    )
 
-    for (category_name, types) in index:
-        print('### {name} ###\n'.format(name=category_name), file=out)
-        for (type_name, opcodes) in types:
+    for category_name, types in index:
+        print(f"### {category_name} ###\n", file=out)
+        for type_name, opcodes in types:
             if type_name:
-                print('#### {name} ####\n'.format(name=type_name), file=out)
-            print('\n', file=out)
+                print(f"#### {type_name} ####\n", file=out)
+            print("\n", file=out)
             for opcode in opcodes:
                 print_opcode(opcode, out)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE",
-              file=sys.stderr)
+        print(
+            "Usage: python make_opcode_doc.py PATH_TO_SPIDERMONKEY_SOURCE",
+            file=sys.stderr,
+        )
         sys.exit(1)
     dir = sys.argv[1]
 
@@ -146,8 +174,8 @@ if __name__ == '__main__':
     try:
         index, _ = jsopcode.get_opcodes(dir)
     except Exception as e:
-        print("Error: {}".format(' '.join(map(str, e.args))), file=sys.stderr)
+        print("Error: {}".format(" ".join(map(str, e.args))), file=sys.stderr)
         sys.exit(1)
 
-    with open(os.path.join(thisdir, '..', 'docs', 'Bytecodes.md'), 'w') as out:
+    with open(os.path.join(thisdir, "..", "docs", "Bytecodes.md"), "w") as out:
         print_doc(index, out)
