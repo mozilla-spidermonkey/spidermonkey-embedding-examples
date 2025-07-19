@@ -1,5 +1,4 @@
 #!/bin/bash
-# Make SpiderMonkey and this repo generic instead of version specific.
-# script shoud be run in mozjs dir with $1 for meson.build location
-sed -i 's/mozjs-$MOZILLA_SYMBOLVERSION/mozjs/g' old-configure.in
+# Make this repo generic instead of version specific.
+# run script with $1 for meson.build location
 sed -i --regexp-extended "s/dependency\(.mozjs.*$/dependency('mozjs')/gm" "$1"

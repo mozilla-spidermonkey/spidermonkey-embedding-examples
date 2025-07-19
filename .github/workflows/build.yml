@@ -57,6 +57,7 @@ jobs:
         ccache -z
         make
         sudo make install
+        sudo cp /usr/local/lib/pkgconfig/mozjs-*.pc /usr/local/lib/pkgconfig/mozjs.pc
         ccache -s
     - name: Build Examples
       run: |
