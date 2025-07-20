@@ -61,5 +61,5 @@ jobs:
         ccache -s
     - name: Build Examples
       run: |
-        meson _build || cat _build/meson-logs/meson-log.txt
+        meson setup _build || cat _build/meson-logs/meson-log.txt
         ninja -C _build
