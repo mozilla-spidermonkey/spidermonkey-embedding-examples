@@ -25,7 +25,7 @@ Currently, the most reliable way to get the SpiderMonkey source code is
 to download the Firefox source.
 At the time of writing, the latest source for Firefox ESR 140, which
 contains the source for SpiderMonkey ESR 140, can be found here:
-https://ftp.mozilla.org/pub/firefox/releases/140.0esr/source/
+https://ftp.mozilla.org/pub/firefox/releases/140.7.0esr/source/
 
 The ESR releases have a major release approximately once a year with
 security patches released throughout the year.
