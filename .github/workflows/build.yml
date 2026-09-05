@@ -30,6 +30,7 @@ jobs:
       run: |
         sudo apt install ccache libreadline-dev llvm clang lld meson ninja-build -y
         rustup toolchain add --profile=minimal stable
+        cargo install cbindgen
     - name: Get SM pkg
       run: ./tools/get_sm.sh
     - name: ccache cache files
