@@ -29,12 +29,7 @@ jobs:
     - name: Install deps
       run: |
         sudo apt install ccache libreadline-dev llvm clang lld meson ninja-build -y
-    - uses: actions-rs/toolchain@v1
-      with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          default: true
+        rustup toolchain add --profile=minimal stable
     - name: Get SM pkg
       run: ./tools/get_sm.sh
     - name: ccache cache files
