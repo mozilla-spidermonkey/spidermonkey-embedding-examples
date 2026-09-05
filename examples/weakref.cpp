@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include <jsapi.h>
 #include <jsfriendapi.h>
 #include <js/CompilationAndEvaluation.h>
@@ -56,8 +54,10 @@ class CustomJobQueue : public JS::JobQueue {
   ~CustomJobQueue() = default;
 
   // JS::JobQueue override
-  JSObject* getIncumbentGlobal(JSContext* cx) override {
-    return JS::CurrentGlobalOrNull(cx);
+  bool getHostDefinedData(JSContext* cx,
+                          JS::MutableHandleObject data) const override {
+    data.set(JS::CurrentGlobalOrNull(cx));
+    return true;
   }
 
   // JS::JobQueue override

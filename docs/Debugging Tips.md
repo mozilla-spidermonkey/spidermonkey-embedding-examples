@@ -31,20 +31,45 @@ js> function f () {
   return 1;
 }
 js> dis(f);
-flags:
-loc     op
------   --
+{
+  "file": "typein",
+  "lineno": 1,
+  "column": 12,
+  "immutableFlags": [
+    "IsFunction",
+    "HasMappedArgsObj"
+  ],
+  "functionName": "f",
+  "functionFlags": [
+    "NORMAL_KIND",
+    "BASESCRIPT",
+    "CONSTRUCTOR"
+  ]
+}
+loc   line  op
+----- ----  --
 main:
-00000:  one
-00001:  return
-00002:  stop
+00000:   2  One                         # 1
+00001:   3  Return                      # 
+00002:   3  RetRval                     # !!! UNREACHABLE !!!
 
 Source notes:
- ofs  line    pc  delta desc     args
----- ---- ----- ------ -------- ------
-  0:    1     0 [   0] newline
-  1:    2     0 [   0] colspan 2
-  3:    2     2 [   2] colspan 9
+ ofs line column    pc  delta desc             args
+---- ---- ------ ----- ------ ---------------- ------
+  0:    1     12     0 [   0] newlinecolumn    column 3
+  2:    2      3     0 [   0] breakpoint-step-sep
+  3:    2      3     1 [   1] newline         
+  4:    3      1     2 [   1] breakpoint      
+
+Exception table:
+kind               stack    start      end
+
+Scope notes:
+   index   parent    start      end
+
+GC things:
+   index   type       value
+       0   Scope      function {} -> global
 ```
 
 In gdb, a function named `js::DisassembleAtPC()` can print the bytecode
@@ -63,7 +88,7 @@ and in parentheses, the `JSScript` pointer and the `jsbytecode` pointer
 (PC) executed.
 
 ```
-$ gdb --args js102
+$ gdb --args js140
 […]
 (gdb) b js::ReportOverRecursed
 (gdb) r
@@ -73,20 +98,21 @@ js> function f(i) {
 }
 js> f(0)
 
-Breakpoint 1, js::ReportOverRecursed (maybecx=0xfdca70) at /home/nicolas/mozilla/ionmonkey/js/src/jscntxt.cpp:495
-495         if (maybecx)
+Thread 1 "js140" hit Breakpoint 1.1, js::ReportOverRecursed (maybecx=maybecx@entry=0x555558871160)
+    at /path/to/js/src/vm/JSContext.cpp:340
+340	  MaybeReportOverRecursedForDifferentialTesting();
 (gdb) call js::DumpBacktrace(maybecx)
-#0          (nil)   typein:2 (0x7fffef1231c0 @ 0)
-#1          (nil)   typein:2 (0x7fffef1231c0 @ 24)
-#2          (nil)   typein:3 (0x7fffef1231c0 @ 47)
-#3          (nil)   typein:2 (0x7fffef1231c0 @ 24)
-#4          (nil)   typein:3 (0x7fffef1231c0 @ 47)
+#0   7fffffdfdf70 I   typein:2 (309ac6b74060 @ 0)
+#1   7fffffdfdfa0 I   typein:2 (309ac6b74060 @ 27)
+#2   7fffffdfdfd0 I   typein:3 (309ac6b74060 @ 53)
+#3   7fffffdfe000 I   typein:2 (309ac6b74060 @ 27)
+#4   7fffffdfe030 I   typein:3 (309ac6b74060 @ 53)
 […]
-#25157 0x7fffefbbc250   typein:2 (0x7fffef1231c0 @ 24)
-#25158 0x7fffefbbc1c8   typein:3 (0x7fffef1231c0 @ 47)
-#25159 0x7fffefbbc140   typein:2 (0x7fffef1231c0 @ 24)
-#25160 0x7fffefbbc0b8   typein:3 (0x7fffef1231c0 @ 47)
-#25161 0x7fffefbbc030   typein:5 (0x7fffef123280 @ 9)
+#11873   5555589b4858 i   typein:2 (322afad74060 @ 27)
+#11874   5555589b47b8 i   typein:3 (322afad74060 @ 53)
+#11875   5555589b4718 i   typein:2 (322afad74060 @ 27)
+#11876   5555589b4678 i   typein:3 (322afad74060 @ 53)
+#11877   5555589b45e0 i   typein:5 (322afad74100 @ 7)
 ```
 
 Note, you can do the exact same exercise above using `lldb` (necessary

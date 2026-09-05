@@ -1,7 +1,7 @@
 # Bytecode Listing #
 
 This document is automatically generated from
-[`Opcodes.h`](https://searchfox.org/mozilla-esr102/source/js/src/vm/Opcodes.h) by
+[`Opcodes.h`](https://searchfox.org/mozilla-esr140/source/js/src/vm/Opcodes.h) by
 [`make_opcode_doc.py`](../tools/make_opcode_doc.py).
 
 ## Background ##
@@ -180,97 +180,7 @@ Push a well-known symbol.
 
 
 
-##### `InitRecord`
-
-**Operands:** `(uint32_t length)`
-
-**Stack:** &rArr; `rval`
-
-Initialize a new record, preallocating `length` memory slots. `length` can still grow
-if needed, for example when using the spread operator.
-
-Implements: [RecordLiteral Evaluation][1] step 1.
-
-[1]: https://tc39.es/proposal-record-tuple/#sec-record-initializer-runtime-semantics-evaluation
-
-
-
-##### `AddRecordProperty`
-
-
-**Stack:** `record, key, value` &rArr; `record`
-
-Add the last element in the stack to the preceding tuple.
-
-Implements: [AddPropertyIntoRecordEntriesList][1].
-
-[1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
-
-
-
-##### `AddRecordSpread`
-
-
-**Stack:** `record, value` &rArr; `record`
-
-Add the last element in the stack to the preceding tuple.
-
-Implements: [RecordPropertyDefinitionEvaluation][1] for
-  RecordPropertyDefinition : ... AssignmentExpression
-
-[1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
-
-
-
-##### `FinishRecord`
-
-
-**Stack:** `record` &rArr; `record`
-
-Mark a record as "initialized", going from "write-only" mode to
-"read-only" mode.
-
-
-
 #### Tuple literals ####
-
-
-
-##### `InitTuple`
-
-**Operands:** `(uint32_t length)`
-
-**Stack:** &rArr; `rval`
-
-Initialize a new tuple, preallocating `length` memory slots. `length` can still grow
-if needed, for example when using the spread operator.
-
-Implements: [TupleLiteral Evaluation][1] step 1.
-
-[1]: https://tc39.es/proposal-record-tuple/#sec-tuple-initializer-runtime-semantics-evaluation
-
-
-
-##### `AddTupleElement`
-
-
-**Stack:** `tuple, element` &rArr; `tuple`
-
-Add the last element in the stack to the preceding tuple.
-
-Implements: [AddValueToTupleSequenceList][1].
-
-[1]: https://tc39.es/proposal-record-tuple/#sec-addvaluetotuplesequencelist
-
-
-
-##### `FinishTuple`
-
-
-**Stack:** `tuple` &rArr; `tuple`
-
-Mark a tuple as "initialized", going from "write-only" mode to
-"read-only" mode.
 
 
 
@@ -662,6 +572,43 @@ sequence `GetLocal "x"; One; Sub; SetLocal "x"` does not give us.
 
 
 
+##### `TypeofEq`
+
+**Operands:** `(TypeofEqOperand operand)`
+
+**Stack:** `val` &rArr; `(typeof val CMP "type")`
+
+A compound opcode for `typeof val === "type"` or `typeof val !== "type"`,
+where `val` is single identifier.
+
+Infallible. The result is always a boolean that depends on the type of
+`val` and `"type"` string, and the comparison operator.
+
+
+**Format:** JOF_IC
+
+##### `StrictConstantEq`, `StrictConstantNe`
+
+**Operands:** `(ConstantCompareOperand operand)`
+
+**Stack:** `val` &rArr; `(val OP constant)`
+
+A compound opcode for strict equality comparisons with constant
+operands. example: `val === null`, `val !== true`. Takes in a single
+operand which encodes the type of the constant and a payload
+if applicable.
+
+
+
+##### `NopIsAssignOp`
+
+
+
+No-op instruction for bytecode decompiler to hint that the previous
+ binary operator is compound assignment.
+
+
+
 ##### `IsNullOrUndefined`
 
 
@@ -739,6 +686,7 @@ Push the `import.meta` object.
 This must be used only in module code.
 
 
+**Format:** JOF_IC
 
 ### Objects ###
 
@@ -748,6 +696,7 @@ This must be used only in module code.
 
 ##### `NewInit`
 
+**Operands:** `(uint8_t propertyCount)`
 
 **Stack:** &rArr; `obj`
 
@@ -828,7 +777,7 @@ Implements: [CreateDataPropertyOrThrow][1] as used in
    [2]: https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-propertydefinitionevaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPINIT, JOF_IC
 
 ##### `InitHiddenProp`
 
@@ -846,7 +795,7 @@ Implements: [PropertyDefinitionEvaluation][1] for methods, steps 3 and
    [1]: https://tc39.es/ecma262/#sec-method-definitions-runtime-semantics-propertydefinitionevaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPINIT, JOF_IC
 
 ##### `InitLockedProp`
 
@@ -865,7 +814,7 @@ false.
    [1]: https://tc39.es/ecma262/#sec-makeconstructor
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPINIT, JOF_IC
 
 ##### `InitElem`, `InitHiddenElem`, `InitLockedElem`
 
@@ -881,14 +830,14 @@ object literals like `{0: val}` and `{[id]: val}`, and methods like
 `*[Symbol.iterator]() {}`.
 
 `JSOp::InitHiddenElem` is the same but defines a non-enumerable property,
-for class methods.
+for class methods and private fields.
 `JSOp::InitLockedElem` is the same but defines a non-enumerable, non-writable, non-configurable property,
 for private class methods.
 
    [1]: https://tc39.es/ecma262/#sec-createdatapropertyorthrow
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+**Format:** JOF_PROPINIT, JOF_IC
 
 ##### `InitPropGetter`, `InitHiddenPropGetter`
 
@@ -905,7 +854,7 @@ Define an accessor property on `obj` with the given `getter`.
 property, for getters in classes.
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT
+**Format:** JOF_ATOM, JOF_PROPINIT
 
 ##### `InitElemGetter`, `InitHiddenElemGetter`
 
@@ -922,7 +871,7 @@ This is used to implement getters like `get [id]() {}` or `get 0() {}`.
 property, for getters in classes.
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT
+**Format:** JOF_PROPINIT
 
 ##### `InitPropSetter`, `InitHiddenPropSetter`
 
@@ -940,7 +889,7 @@ This is used to implement ordinary setters like `set foo(v) {}`.
 property, for setters in classes.
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPINIT
+**Format:** JOF_ATOM, JOF_PROPINIT
 
 ##### `InitElemSetter`, `InitHiddenElemSetter`
 
@@ -957,7 +906,7 @@ keys.
 property, for setters in classes.
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT
+**Format:** JOF_PROPINIT
 
 #### Accessing properties ####
 
@@ -978,7 +927,7 @@ Implements: [GetV][1], [GetValue][2] step 5.
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_IC
+**Format:** JOF_ATOM, JOF_IC
 
 ##### `GetElem`
 
@@ -993,7 +942,7 @@ Implements: [GetV][1], [GetValue][2] step 5.
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ELEM, JOF_IC
+**Format:** JOF_IC
 
 ##### `SetProp`
 
@@ -1012,7 +961,7 @@ Implements: [PutValue][1] step 6 for non-strict code.
 [1]: https://tc39.es/ecma262/#sec-putvalue
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
 
 ##### `StrictSetProp`
 
@@ -1025,7 +974,7 @@ Like `JSOp::SetProp`, but for strict mode code. Throw a TypeError if
 no setter, or if `obj` is a primitive value.
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
 
 ##### `SetElem`
 
@@ -1039,7 +988,7 @@ Implements: [PutValue][1] step 6 for non-strict code.
 [1]: https://tc39.es/ecma262/#sec-putvalue
 
 
-**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
 
 ##### `StrictSetElem`
 
@@ -1051,7 +1000,7 @@ Like `JSOp::SetElem`, but for strict mode code. Throw a TypeError if
 no setter, or if `obj` is a primitive value.
 
 
-**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
 
 ##### `DelProp`
 
@@ -1070,7 +1019,7 @@ Implements: [`delete obj.propname`][1] step 5 in non-strict code.
 [1]: https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_CHECKSLOPPY
+**Format:** JOF_ATOM, JOF_CHECKSLOPPY
 
 ##### `StrictDelProp`
 
@@ -1082,7 +1031,7 @@ Like `JSOp::DelProp`, but for strict mode code. Push `true` on success,
 else throw a TypeError.
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_CHECKSTRICT
+**Format:** JOF_ATOM, JOF_CHECKSTRICT
 
 ##### `DelElem`
 
@@ -1099,7 +1048,7 @@ Implements: [`delete obj[key]`][1] step 5 in non-strict code.
 [1]: https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
 
 
-**Format:** JOF_ELEM, JOF_CHECKSLOPPY
+**Format:** JOF_CHECKSLOPPY
 
 ##### `StrictDelElem`
 
@@ -1110,7 +1059,7 @@ Like `JSOp::DelElem, but for strict mode code. Push `true` on success,
 else throw a TypeError.
 
 
-**Format:** JOF_ELEM, JOF_CHECKSTRICT
+**Format:** JOF_CHECKSTRICT
 
 ##### `HasOwn`
 
@@ -1199,7 +1148,7 @@ method.
 [2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_IC
+**Format:** JOF_ATOM, JOF_IC
 
 ##### `GetElemSuper`
 
@@ -1218,7 +1167,7 @@ method); [`Reflect.get(obj, key, receiver)`][3].
 [3]: https://tc39.es/ecma262/#sec-reflect.get
 
 
-**Format:** JOF_ELEM, JOF_IC
+**Format:** JOF_IC
 
 ##### `SetPropSuper`
 
@@ -1237,7 +1186,7 @@ the enclosing method.
 [2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSLOPPY
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSLOPPY
 
 ##### `StrictSetPropSuper`
 
@@ -1248,7 +1197,7 @@ the enclosing method.
 Like `JSOp::SetPropSuper`, but for strict mode code.
 
 
-**Format:** JOF_ATOM, JOF_PROP, JOF_PROPSET, JOF_CHECKSTRICT
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSTRICT
 
 ##### `SetElemSuper`
 
@@ -1266,7 +1215,7 @@ the enclosing method.
 [2]: https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
 
 
-**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSLOPPY
+**Format:** JOF_PROPSET, JOF_CHECKSLOPPY
 
 ##### `StrictSetElemSuper`
 
@@ -1276,7 +1225,7 @@ the enclosing method.
 Like `JSOp::SetElemSuper`, but for strict mode code.
 
 
-**Format:** JOF_ELEM, JOF_PROPSET, JOF_CHECKSTRICT
+**Format:** JOF_PROPSET, JOF_CHECKSTRICT
 
 #### Enumeration ####
 
@@ -1362,6 +1311,39 @@ Exit a for-in loop, closing the iterator.
 #### Iteration ####
 
 
+
+##### `CloseIter`
+
+**Operands:** `(CompletionKind kind)`
+
+**Stack:** `iter` &rArr;
+
+If the iterator object on top of the stack has a `return` method,
+call that method. If the method exists but does not return an object,
+and `kind` is not `CompletionKind::Throw`, throw a TypeError. (If
+`kind` is `Throw`, the error we are already throwing takes precedence.)
+
+`iter` must be an object conforming to the [Iterator][1] interface.
+
+Implements: [IteratorClose][2]
+
+[1]: https://tc39.es/ecma262/#sec-iterator-interface
+[2]: https://tc39.es/ecma262/#sec-iteratorclose
+
+**Format:** JOF_IC
+
+##### `OptimizeGetIterator`
+
+
+**Stack:** `iterable` &rArr; `is_optimizable`
+
+If we can optimize iteration for `iterable`, meaning that it is a packed
+array and nothing important has been tampered with, then we replace it
+with `true`, otherwise we replace it with `false`. This is similar in
+operation to OptimizeSpreadCall.
+
+
+**Format:** JOF_IC
 
 ##### `CheckIsObj`
 
@@ -1474,7 +1456,7 @@ common case where *nextIndex* is known.
 [1]: https://tc39.es/ecma262/#sec-runtime-semantics-arrayaccumulation
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT
+**Format:** JOF_PROPINIT
 
 ##### `InitElemInc`
 
@@ -1493,7 +1475,8 @@ This never calls setters or proxy traps.
 except by `JSOp::InitElemArray` and `JSOp::InitElemInc`.
 
 `index` must be an integer, `0 <= index <= INT32_MAX`. If `index` is
-`INT32_MAX`, this throws a RangeError.
+`INT32_MAX`, this throws a RangeError. Unlike `InitElemArray`, it is not
+necessary that the `array` length > `index`.
 
 This instruction is used when an array literal contains a
 *SpreadElement*. In `[a, ...b, c]`, `InitElemArray 0` is used to put
@@ -1506,7 +1489,7 @@ CreateDataProperty, set the array length, and/or increment *nextIndex*.
 [1]: https://tc39.es/ecma262/#sec-runtime-semantics-arrayaccumulation
 
 
-**Format:** JOF_ELEM, JOF_PROPINIT, JOF_IC
+**Format:** JOF_PROPINIT, JOF_IC
 
 ##### `Hole`
 
@@ -1555,6 +1538,7 @@ Pushes the current global's %BuiltinObject%.
 `BuiltinObjectKind::None`).
 
 
+**Format:** JOF_IC
 
 ### Functions ###
 
@@ -1582,7 +1566,7 @@ Implements: [InstantiateFunctionObject][1], [Evaluation for
 [2]: https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
 
 
-**Format:** JOF_OBJECT
+**Format:** JOF_OBJECT, JOF_USES_ENV, JOF_IC
 
 ##### `SetFunName`
 
@@ -1652,13 +1636,13 @@ Implements: [ClassDefinitionEvaluation][1] steps 6.e.ii, 6.g.iii, and
 [1]: https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
 
 
-**Format:** JOF_OBJECT
+**Format:** JOF_OBJECT, JOF_USES_ENV
 
 #### Calls ####
 
 
 
-##### `Call`, `CallIter`, `CallIgnoresRv`
+##### `Call`, `CallContent`, `CallIter`, `CallContentIter`, `CallIgnoresRv`
 
 **Operands:** `(uint16_t argc)`
 
@@ -1667,10 +1651,18 @@ Implements: [ClassDefinitionEvaluation][1] steps 6.e.ii, 6.g.iii, and
 Invoke `callee` with `this` and `args`, and push the return value. Throw
 a TypeError if `callee` isn't a function.
 
+`JSOp::CallContent` is for `callContentFunction` in self-hosted JS, and
+this is for handling it differently in debugger's `onNativeCall` hook.
+`onNativeCall` hook disables all JITs, and `JSOp::CallContent` is
+treated exactly the same as `JSOP::Call` in JIT.
+
 `JSOp::CallIter` is used for implicit calls to @@iterator methods, to
 ensure error messages are formatted with `JSMSG_NOT_ITERABLE` ("x is not
 iterable") rather than `JSMSG_NOT_FUNCTION` ("x[Symbol.iterator] is not
 a function"). The `argc` operand must be 0 for this variation.
+
+`JSOp::CallContentIter` is `JSOp::CallContent` variant of
+`JSOp::CallIter`.
 
 `JSOp::CallIgnoresRv` hints to the VM that the return value is ignored.
 This allows alternate faster implementations to be used that avoid
@@ -1785,29 +1777,21 @@ See `JSOp::SpreadCall` for restrictions on `args`.
 
 ##### `ImplicitThis`
 
-**Operands:** `(uint32_t nameIndex)`
 
-**Stack:** &rArr; `this`
+**Stack:** `env` &rArr; `this`
 
 Push the implicit `this` value for an unqualified function call, like
-`foo()`. `nameIndex` gives the name of the function we're calling.
+`foo()`.
 
 The result is always `undefined` except when the name refers to a `with`
 binding.  For example, in `with (date) { getFullYear(); }`, the
 implicit `this` passed to `getFullYear` is `date`, not `undefined`.
 
-This walks the run-time environment chain looking for the environment
-record that contains the function. If the function call definitely
-refers to a local binding, use `JSOp::Undefined`.
-
-Implements: [EvaluateCall][1] step 1.b. But not entirely correctly.
-See [bug 1166408][2].
+Implements: [EvaluateCall][1] step 1.b.
 
 [1]: https://tc39.es/ecma262/#sec-evaluatecall
-[2]: https://bugzilla.mozilla.org/show_bug.cgi?id=1166408
 
 
-**Format:** JOF_ATOM
 
 ##### `CallSiteObj`
 
@@ -1817,16 +1801,10 @@ See [bug 1166408][2].
 
 Push the call site object for a tagged template call.
 
-`script->getObject(objectIndex)` is the call site object;
-`script->getObject(objectIndex + 1)` is the raw object.
+`script->getObject(objectIndex)` is the call site object.
 
-The first time this instruction runs for a given template, it assembles
-the final value, defining the `.raw` property on the call site object
-and freezing both objects.
-
-Implements: [GetTemplateObject][1], steps 4 and 12-16.
-
-[1]: https://tc39.es/ecma262/#sec-gettemplateobject
+The call site object will already have the `.raw` property defined on it
+and will be frozen.
 
 
 **Format:** JOF_OBJECT
@@ -1843,7 +1821,7 @@ This magic value is a required argument to the `JSOp::New` and
 
 
 
-##### `New`, `SuperCall`
+##### `New`, `NewContent`, `SuperCall`
 
 **Operands:** `(uint16_t argc)`
 
@@ -1857,6 +1835,9 @@ the return value. Throw a TypeError if `callee` isn't a constructor.
 `JSOp::SuperCall` behaves exactly like `JSOp::New`, but is used for
 *SuperCall* expressions, to allow JITs to distinguish them from `new`
 expressions.
+
+`JSOp::NewContent` is for `constructContentFunction` in self-hosted JS.
+See the comment for `JSOp::CallContent` for more details.
 
 Implements: [EvaluateConstruct][1] steps 7 and 8.
 
@@ -1931,6 +1912,7 @@ object for the current frame (that is, this instruction must execute at
 most once per generator or async call).
 
 
+**Format:** JOF_USES_ENV
 
 ##### `InitialYield`
 
@@ -2072,18 +2054,36 @@ Implements: [Await][1], steps 2-9.
 
 ##### `AsyncResolve`
 
-**Operands:** `(AsyncFunctionResolveKind fulfillOrReject)`
 
-**Stack:** `valueOrReason, gen` &rArr; `promise`
+**Stack:** `value, gen` &rArr; `promise`
 
-Resolve or reject the current async function's result promise with
-'valueOrReason'.
+Resolve the current async function's result promise with 'value'.
 
 This instruction must appear only in non-generator async function
 scripts. `gen` must be the internal generator object for the current
 frame. This instruction must run at most once per async function call,
-as resolving/rejecting an already resolved/rejected promise is not
-permitted.
+as resolving an already resolved/rejected promise is not permitted.
+
+The result `promise` is the async function's result promise,
+`gen->as<AsyncFunctionGeneratorObject>().promise()`.
+
+Implements: [AsyncFunctionStart][1], step 4.d.i. and 4.e.i.
+
+[1]: https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
+
+
+
+##### `AsyncReject`
+
+
+**Stack:** `reason, stack, gen` &rArr; `promise`
+
+Reject the current async function's result promise with 'reason'.
+
+This instruction must appear only in non-generator async function
+scripts. `gen` must be the internal generator object for the current
+frame. This instruction must run at most once per async function call,
+as rejecting an already resolved/rejected promise is not permitted.
 
 The result `promise` is the async function's result promise,
 `gen->as<AsyncFunctionGeneratorObject>().promise()`.
@@ -2530,11 +2530,39 @@ environment chain and resumes execution at the top of the `catch` or
 
 Implements: [*ThrowStatement* Evaluation][1], step 3.
 
-This is also used in for-of loops. If the body of the loop throws an
-exception, we catch it, close the iterator, then use `JSOp::Throw` to
-rethrow.
-
 [1]: https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
+
+
+
+##### `ThrowWithStack`
+
+
+**Stack:** `exc, stack` &rArr;
+
+Throw `exc`. (ノಠ益ಠ)ノ彡┴──┴
+
+This sets the pending exception to `exc`, the pending exception stack
+to `stack`, and then jumps to error-handling code. If we're in a `try`
+block, error handling adjusts the stack and environment chain and resumes
+execution at the top of the `catch` or `finally` block. Otherwise it
+starts unwinding the stack.
+
+This is used in for-of loops. If the body of the loop throws an
+exception, we catch it, close the iterator, then use
+`JSOp::ThrowWithStack` to rethrow.
+
+
+
+##### `CreateSuppressedError`
+
+
+**Stack:** `error, suppressed` &rArr; `suppressedError`
+
+Create a suppressed error object and push it on the stack.
+
+Implements: [DisposeResources ( disposeCapability, completion )][1], step 3.e.iii.1.a-f.
+
+[1] https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-disposeresources
 
 
 
@@ -2563,7 +2591,7 @@ The number of arguments in the error message must be 0.
 Throws a runtime TypeError for invalid assignment to a `const` binding.
 
 
-**Format:** JOF_ATOM, JOF_NAME
+**Format:** JOF_ATOM
 
 ##### `Try`
 
@@ -2601,8 +2629,23 @@ This must be used only in the fixed sequence of instructions following a
 `JSTRY_CATCH` span (see "Bytecode Invariants" above), as that's the only
 way instructions would run with an exception pending.
 
-Used to implement catch-blocks, including the implicit ones generated as
-part of for-of iteration.
+Used to implement catch-blocks.
+
+
+
+##### `ExceptionAndStack`
+
+
+**Stack:** &rArr; `exception, stack`
+
+Push and clear the pending exception. ┬──┬◡ﾉ(° -°ﾉ)
+
+This must be used only in the fixed sequence of instructions following a
+`JSTRY_CATCH` span (see "Bytecode Invariants" above), as that's the only
+way instructions would run with an exception pending.
+
+Used to implement implicit catch-blocks generated as part of for-of
+iteration.
 
 
 
@@ -2654,7 +2697,7 @@ this is how `const` bindings are initialized.)
 [2]: https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
 
 
-**Format:** JOF_LOCAL, JOF_NAME
+**Format:** JOF_LOCAL
 
 ##### `InitGLexical`
 
@@ -2671,7 +2714,7 @@ Like `JSOp::InitLexical` but for global lexicals. Unlike `InitLexical`
 this can't be used to mark a binding as uninitialized.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_PROPINIT, JOF_GNAME, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPINIT, JOF_GNAME, JOF_IC
 
 ##### `InitAliasedLexical`
 
@@ -2691,7 +2734,7 @@ initializing.
 argument `a` is initialized from inside a nested scope, so `hops == 1`.
 
 
-**Format:** JOF_ENVCOORD, JOF_NAME, JOF_PROPINIT
+**Format:** JOF_ENVCOORD, JOF_PROPINIT
 
 ##### `CheckLexical`
 
@@ -2710,7 +2753,7 @@ Implements: [GetBindingValue][1] step 3 and [SetMutableBinding][2] step
 [2]: https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
 
 
-**Format:** JOF_LOCAL, JOF_NAME
+**Format:** JOF_LOCAL
 
 ##### `CheckAliasedLexical`
 
@@ -2727,7 +2770,7 @@ they're unnecessary. `JSOp::{Get,Set}{Name,GName}` all check for
 uninitialized lexicals and throw if needed.
 
 
-**Format:** JOF_ENVCOORD, JOF_NAME
+**Format:** JOF_ENVCOORD
 
 ##### `CheckThis`
 
@@ -2749,7 +2792,7 @@ Implements: [GetThisBinding][1] step 3.
 
 
 
-##### `BindGName`
+##### `BindUnqualifiedGName`
 
 **Operands:** `(uint32_t nameIndex)`
 
@@ -2757,10 +2800,23 @@ Implements: [GetThisBinding][1] step 3.
 
 Look up a name on the global lexical environment's chain and push the
 environment which contains a binding for that name. If no such binding
-exists, push the global lexical environment.
+exists, push the top-most variables object, which is the global object.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_GNAME, JOF_IC
+**Format:** JOF_ATOM, JOF_GNAME, JOF_IC
+
+##### `BindUnqualifiedName`
+
+**Operands:** `(uint32_t nameIndex)`
+
+**Stack:** &rArr; `env`
+
+Look up an unqualified name on the environment chain and push the
+environment which contains a binding for that name. If no such binding
+exists, push the first variables object along the environment chain.
+
+
+**Format:** JOF_ATOM, JOF_IC, JOF_USES_ENV
 
 ##### `BindName`
 
@@ -2770,10 +2826,10 @@ exists, push the global lexical environment.
 
 Look up a name on the environment chain and push the environment which
 contains a binding for that name. If no such binding exists, push the
-global lexical environment.
+global object.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_IC
+**Format:** JOF_ATOM, JOF_IC, JOF_USES_ENV
 
 #### Getting binding values ####
 
@@ -2789,7 +2845,8 @@ Find a binding on the environment chain and push its value.
 
 If the binding is an uninitialized lexical, throw a ReferenceError. If
 no such binding exists, throw a ReferenceError unless the next
-instruction is `JSOp::Typeof`, in which case push `undefined`.
+instruction is `JSOp::Typeof` or `JSOp::TypeofEq` (see IsTypeOfNameOp),
+in which case push `undefined`.
 
 Implements: [ResolveBinding][1] followed by [GetValue][2]
 (adjusted hackily for `typeof`).
@@ -2801,7 +2858,7 @@ cases. Optimized instructions follow.
 [2]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_IC
+**Format:** JOF_ATOM, JOF_IC, JOF_USES_ENV
 
 ##### `GetGName`
 
@@ -2827,7 +2884,7 @@ found (unless the next instruction is `JSOp::Typeof`) or if the binding
 is an uninitialized lexical.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_GNAME, JOF_IC
+**Format:** JOF_ATOM, JOF_GNAME, JOF_IC
 
 ##### `GetArg`
 
@@ -2839,7 +2896,20 @@ Push the value of an argument that is stored in the stack frame
 or in an `ArgumentsObject`.
 
 
-**Format:** JOF_QARG, JOF_NAME
+**Format:** JOF_QARG
+
+##### `GetFrameArg`
+
+**Operands:** `(uint16_t argno)`
+
+**Stack:** &rArr; `arguments[argno]`
+
+Push the value of an argument that is stored in the stack frame. Like
+`JSOp::GetArg`, but ignores the frame's `ArgumentsObject` and doesn't
+assert the argument is unaliased.
+
+
+**Format:** JOF_QARG
 
 ##### `GetLocal`
 
@@ -2853,7 +2923,32 @@ If the variable is an uninitialized lexical, push
 `MagicValue(JS_UNINIITALIZED_LEXICAL)`.
 
 
-**Format:** JOF_LOCAL, JOF_NAME
+**Format:** JOF_LOCAL
+
+##### `ArgumentsLength`
+
+
+**Stack:** &rArr; `arguments.length`
+
+Push the number of actual arguments as Int32Value.
+
+This is emitted for the ArgumentsLength() intrinsic in self-hosted code,
+and if the script uses only arguments.length.
+
+
+
+##### `GetActualArg`
+
+
+**Stack:** `index` &rArr; `arguments[index]`
+
+Push the value of an argument that is stored in the stack frame. The
+value on top of the stack must be an Int32Value storing the index. The
+index must be less than the number of actual arguments.
+
+This is emitted for the GetArgument(i) intrinsic in self-hosted code.
+
+
 
 ##### `GetAliasedVar`
 
@@ -2880,7 +2975,7 @@ to non-strict `eval` or `with`) that might shadow the aliased binding.
 [1]: https://searchfox.org/mozilla-central/search?q=symbol:T_js%3A%3AEnvironmentCoordinate
 
 
-**Format:** JOF_ENVCOORD, JOF_NAME
+**Format:** JOF_ENVCOORD, JOF_USES_ENV
 
 ##### `GetAliasedDebugVar`
 
@@ -2892,7 +2987,7 @@ Push the value of an aliased binding, which may have to bypass a DebugEnvironmen
 on the environment chain.
 
 
-**Format:** JOF_DEBUGCOORD, JOF_NAME
+**Format:** JOF_DEBUGCOORD
 
 ##### `GetImport`
 
@@ -2903,7 +2998,7 @@ on the environment chain.
 Get the value of a module import by name and pushes it onto the stack.
 
 
-**Format:** JOF_ATOM, JOF_NAME
+**Format:** JOF_ATOM, JOF_IC
 
 ##### `GetBoundName`
 
@@ -2915,22 +3010,25 @@ Get the value of a binding from the environment `env`. If the name is
 not bound in `env`, throw a ReferenceError.
 
 `env` must be an environment currently on the environment chain, pushed
-by `JSOp::BindName` or `JSOp::BindVar`.
+by `JSOp::BindName`, `JSOp::BindUnqualifiedName`, or `JSOp::BindVar`.
 
-Note: `JSOp::BindName` and `JSOp::GetBoundName` are the two halves of the
-`JSOp::GetName` operation: finding and reading a variable. This
-decomposed version is needed to implement the compound assignment and
-increment/decrement operators, which get and then set a variable. The
-spec says the variable lookup is done only once. If we did the lookup
+Note: `JSOp::Bind(Unqualified)Name` and `JSOp::GetBoundName` are the two
+halves of the `JSOp::GetName` operation: finding and reading a variable.
+This decomposed version is needed to implement:
+1. The call operator, which gets a variable and its this-environment.
+2. The compound assignment and increment/decrement operators, which get
+   and then set a variable.
+The spec says the variable lookup is done only once. If we did the lookup
 twice, there would be observable bugs, thanks to dynamic scoping. We
-could set the wrong variable or call proxy traps incorrectly.
+could get the wrong this-environment resp. variable or call proxy traps
+incorrectly.
 
 Implements: [GetValue][1] steps 4 and 6.
 
 [1]: https://tc39.es/ecma262/#sec-getvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_IC
+**Format:** JOF_ATOM, JOF_IC
 
 ##### `GetIntrinsic`
 
@@ -2945,7 +3043,7 @@ Non-standard. Intrinsics are slots in the intrinsics holder object (see
 bindings in self-hosting code.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_IC
+**Format:** JOF_ATOM, JOF_IC
 
 ##### `Callee`
 
@@ -2995,24 +3093,24 @@ Throw a ReferenceError if the binding is an uninitialized lexical.
 This can call setters and/or proxy traps.
 
 `env` must be an environment currently on the environment chain,
-pushed by `JSOp::BindName` or `JSOp::BindVar`.
+pushed by `JSOp::BindUnqualifiedName` or `JSOp::BindVar`.
 
 This is the fallback `Set` instruction that handles all unoptimized
 cases. Optimized instructions follow.
 
 Implements: [PutValue][1] steps 5 and 7 for unoptimized bindings.
 
-Note: `JSOp::BindName` and `JSOp::SetName` are the two halves of simple
-assignment: finding and setting a variable. They are two separate
-instructions because, per spec, the "finding" part happens before
-evaluating the right-hand side of the assignment, and the "setting" part
-after. Optimized cases don't need a `Bind` instruction because the
-"finding" is done statically.
+Note: `JSOp::BindUnqualifiedName` and `JSOp::SetName` are the two halves
+of simple assignment: finding and setting a variable. They are two
+separate instructions because, per spec, the "finding" part happens
+before evaluating the right-hand side of the assignment, and the
+"setting" part after. Optimized cases don't need a `Bind` instruction
+because the "finding" is done statically.
 
 [1]: https://tc39.es/ecma262/#sec-putvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSLOPPY, JOF_IC, JOF_USES_ENV
 
 ##### `StrictSetName`
 
@@ -3029,7 +3127,7 @@ Implements: [PutValue][1] steps 5 and 7 for strict mode code.
 [1]: https://tc39.es/ecma262/#sec-putvalue
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_CHECKSTRICT, JOF_IC, JOF_USES_ENV
 
 ##### `SetGName`
 
@@ -3038,10 +3136,10 @@ Implements: [PutValue][1] steps 5 and 7 for strict mode code.
 **Stack:** `env, val` &rArr; `val`
 
 Like `JSOp::SetName`, but for assigning to globals. `env` must be an
-environment pushed by `JSOp::BindGName`.
+environment pushed by `JSOp::BindUnqualifiedGName`.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_GNAME, JOF_CHECKSLOPPY, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_GNAME, JOF_CHECKSLOPPY, JOF_IC
 
 ##### `StrictSetGName`
 
@@ -3050,10 +3148,10 @@ environment pushed by `JSOp::BindGName`.
 **Stack:** `env, val` &rArr; `val`
 
 Like `JSOp::StrictSetGName`, but for assigning to globals. `env` must be
-an environment pushed by `JSOp::BindGName`.
+an environment pushed by `JSOp::BindUnqualifiedGName`.
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_PROPSET, JOF_GNAME, JOF_CHECKSTRICT, JOF_IC
+**Format:** JOF_ATOM, JOF_PROPSET, JOF_GNAME, JOF_CHECKSTRICT, JOF_IC
 
 ##### `SetArg`
 
@@ -3065,7 +3163,7 @@ Assign `val` to an argument binding that's stored in the stack frame or
 in an `ArgumentsObject`.
 
 
-**Format:** JOF_QARG, JOF_NAME
+**Format:** JOF_QARG
 
 ##### `SetLocal`
 
@@ -3076,7 +3174,7 @@ in an `ArgumentsObject`.
 Assign to an optimized local binding.
 
 
-**Format:** JOF_LOCAL, JOF_NAME
+**Format:** JOF_LOCAL
 
 ##### `SetAliasedVar`
 
@@ -3093,7 +3191,7 @@ and has been initialized.
 [1]: https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
 
 
-**Format:** JOF_ENVCOORD, JOF_NAME, JOF_PROPSET
+**Format:** JOF_ENVCOORD, JOF_PROPSET, JOF_USES_ENV
 
 ##### `SetIntrinsic`
 
@@ -3109,7 +3207,7 @@ object, `GlobalObject::getIntrinsicsHolder`. (Self-hosted code doesn't
 have many global `var`s, but it has many `function`s.)
 
 
-**Format:** JOF_ATOM, JOF_NAME
+**Format:** JOF_ATOM
 
 #### Entering and leaving environments ####
 
@@ -3158,7 +3256,7 @@ after a `JSOp::PopLexicalEnv`, then those must be correctly noted as
 [1]: https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
 
 
-**Format:** JOF_SCOPE
+**Format:** JOF_SCOPE, JOF_USES_ENV
 
 ##### `PopLexicalEnv`
 
@@ -3169,6 +3267,7 @@ Pop a lexical or class-body environment from the environment chain.
 See `JSOp::PushLexicalEnv` for the fine print.
 
 
+**Format:** JOF_USES_ENV
 
 ##### `DebugLeaveLexicalEnv`
 
@@ -3190,6 +3289,7 @@ or `JSOp::PopLexicalEnv` (if not).
 
 ##### `RecreateLexicalEnv`
 
+**Operands:** `(uint32_t lexicalScopeIndex)`
 
 
 Replace the current block on the environment chain with a fresh block
@@ -3200,9 +3300,11 @@ loop-head declares lexical variables that may be captured.
 The current environment must be a BlockLexicalEnvironmentObject.
 
 
+**Format:** JOF_SCOPE
 
 ##### `FreshenLexicalEnv`
 
+**Operands:** `(uint32_t lexicalScopeIndex)`
 
 
 Like `JSOp::RecreateLexicalEnv`, but the values of all the bindings are
@@ -3210,6 +3312,7 @@ copied from the old block to the new one. This is used for C-style
 `for(let ...; ...; ...)` loops.
 
 
+**Format:** JOF_SCOPE
 
 ##### `PushClassBodyEnv`
 
@@ -3263,7 +3366,7 @@ not needed.
 [2]: https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
 
 
-**Format:** JOF_SCOPE
+**Format:** JOF_SCOPE, JOF_USES_ENV
 
 ##### `EnterWith`
 
@@ -3278,10 +3381,11 @@ Implements: [Evaluation of `with` statements][1], steps 2-6.
 
 Operations that may need to consult a WithEnvironment can't be correctly
 implemented using optimized instructions like `JSOp::GetLocal`. A script
-must use the deoptimized `JSOp::GetName`, `BindName`, `SetName`, and
-`DelName` instead. Since those instructions don't work correctly with
-optimized locals and arguments, all bindings in scopes enclosing a
-`with` statement are marked as "aliased" and deoptimized too.
+must use the deoptimized `JSOp::GetName`, `BindUnqualifiedName`,
+`BindName`,`SetName`, and `DelName` instead. Since those instructions
+don't work correctly with optimized locals and arguments, all bindings in
+scopes enclosing a `with` statement are marked as "aliased" and
+deoptimized too.
 
 See `JSOp::PushLexicalEnv` for the fine print.
 
@@ -3304,6 +3408,38 @@ Implements: [Evaluation of `with` statements][1], step 8.
 
 
 
+##### `AddDisposable`
+
+**Operands:** `(UsingHint hint)`
+
+**Stack:** `v, method, needsClosure` &rArr;
+
+Append the object and method on the stack as a disposable to be disposed on
+to the current lexical environment object.
+
+Implements: [AddDisposableResource ( disposeCapability, V, hint [ , method ] )][1], steps 3-4.
+
+[1] https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-adddisposableresource
+
+
+**Format:** JOF_USES_ENV
+
+##### `TakeDisposeCapability`
+
+
+**Stack:** &rArr; `disposeCapability`
+
+Get the dispose capability of the present environment object.
+In case the dispose capability of the environment
+has already been cleared or if no disposables have been
+pushed to the capability, it shall push undefined as the dispose
+capability. After extracting a non-empty dispose
+capability, the dispose capability is cleared from the present
+environment object by setting it to undefined value.
+
+
+**Format:** JOF_USES_ENV
+
 #### Creating and deleting bindings ####
 
 
@@ -3324,6 +3460,7 @@ can't be optimized.
 [1]: https://tc39.es/ecma262/#sec-web-compat-functiondeclarationinstantiation
 
 
+**Format:** JOF_USES_ENV
 
 ##### `GlobalOrEvalDeclInstantiation`
 
@@ -3346,7 +3483,7 @@ from index `0` thru `lastFun` contain only scopes and hoisted functions.
 [2]: https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 
 
-**Format:** JOF_GCTHING
+**Format:** JOF_GCTHING, JOF_USES_ENV
 
 ##### `DelName`
 
@@ -3366,7 +3503,7 @@ strict mode code.
    [2]: https://tc39.es/ecma262/#sec-delete-operator-static-semantics-early-errors
 
 
-**Format:** JOF_ATOM, JOF_NAME, JOF_CHECKSLOPPY
+**Format:** JOF_ATOM, JOF_CHECKSLOPPY, JOF_USES_ENV
 
 #### Function environment setup ####
 
@@ -3392,6 +3529,7 @@ The current script must be a function script. This instruction must
 execute at most once per function activation.
 
 
+**Format:** JOF_USES_ENV
 
 ##### `Rest`
 

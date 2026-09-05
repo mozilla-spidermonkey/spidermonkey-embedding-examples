@@ -52,6 +52,10 @@ The JavaScript stack is unwound in the normal way except that `catch`
 and `finally` blocks are ignored.
 The most recent JSAPI call returns `false` or `nullptr` to the application.
 
+To avoid unintended uncatchable exceptions, debug builds of
+SpiderMonkey require also calling `JS::ReportUncatchableException` when
+throwing one intentionally.
+
 An uncatchable error leaves the `JSContext` in a good state.
 It can be used again right away. The application does not have to do
 anything to “recover” from the error, as far as the JSAPI is concerned.
@@ -64,6 +68,6 @@ Here is some example code that throws an uncatchable error.
 Log("The server room is on fire!");
 
 /* Make sure the error is uncatchable. */
-JS_ClearPendingException(cx);
+JS::ReportUncatchableException(cx);
 return false;
 ```

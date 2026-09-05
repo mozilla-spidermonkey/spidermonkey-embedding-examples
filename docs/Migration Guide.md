@@ -3,6 +3,147 @@
 This document describes how to port your code from using one ESR version
 of SpiderMonkey to the next ESR version.
 
+## ESR 128 to ESR 140 ##
+
+### Scope chains ###
+
+Various script execution APIs take a scope chain argument, for when the
+script is intended to be executed within one or more additional scopes
+nested within the global object.
+Previously, this scope chain was a vector of JSObject.
+
+Starting in this version, it is a `JS::EnvironmentChain`.
+`JS::EnvironmentChain` has basically the same API as
+`JS::RootedObjectVector` but its constructor takes an additional
+argument, either `JS::SupportUnscopables::Yes` or
+`JS::SupportUnscopables::No`.
+
+This additional argument determines whether the `[Symbol.unscopables]`
+property on the scope objects should be taken into account, to exclude
+some of the objects' properties.
+Usually, embeddings are not using the `[Symbol.unscopables]` property,
+so unless you know specifically that you need it, you can most likely
+pass `JS::SupportUnscopables::No`.
+
+**Recommendation:** Rewrite your code like this:
+```c++
+// old
+JS::RootedObjectVector scope_chain{cx};
+// new
+JS::EnvironmentChain scope_chain{cx, JS::SupportUnscopables::No};
+```
+And make sure to include `<js/EnvironmentChain.h>`.
+
+### Uncatchable exceptions ###
+
+If a JSNative callback returns false without reporting an exception,
+that signifies an uncatchable exception.
+Since it is easy to forget to report an exception, now debug builds of
+SpiderMonkey will assert that `JS::ReportUncatchableException()` has
+been called, to make sure the uncatchable exception is intentional.
+
+**Recommendation:** Your code will still work in release builds if you
+don't do this, but make sure to call `JS::ReportUncatchableException()`
+wherever an uncatchable exception is intended (for example, if your
+interpreter uses an uncatchable exception for its "exit" command.)
+
+### Stashed pointers
+
+There is a new feature in `<js/ObjectWithStashedPointer.h>`:
+`JS::NewObjectWithStashedPointer()` and `JS::ObjectGetStashedPointer()`.
+These allow creating a JS object with a C++ pointer from the embedding
+stashed in one of its private slots.
+
+The pointer can optionally have a destructor function called on it when
+the object is finalized.
+
+**Recommendation:** A JS object with a stashed C++ pointer is often
+needed in embedder code.
+If you need the simple case where the object doesn't need any custom
+`JSClassOps` behaviour, consider simplifying your code by using this
+feature.
+
+### `Error.isError()` customization
+
+`Error.isError()` is a new static method on the `Error` object in
+JavaScript.
+If you define custom exception objects in your embedding that do not
+inherit from `Error`, you may wish to make `Error.isError()` return true
+when called on them.
+
+**Recommendation:** Consider whether any custom exception objects need
+to return true when passed to `Error.isError()`.
+In browsers, for example, this happens for `DOMException` objects.
+If so, you will need to call `js::SetDOMCallbacks()` when setting up the
+`JSContext`, and pass a `js::DOMCallbacks` struct with a callback
+pointer as its `instanceClassIsError` member.
+
+This callback will need to determine whether the passed-in `JSClass`
+pointer should be considered an error object or not.
+Usually this is done by comparing it with the custom exception object's
+`JSClass` by pointer equality, but other conditions are possible.
+Note that the callback does not have access to the instance's `JSObject`
+pointer itself, so the determination can only be made by class.
+
+You will also need to add `JSCLASS_IS_DOMJSCLASS` to the object's
+`JSClass.flags`, in order for this callback to get called at all.
+
+### Module API changes
+
+There are a few changes to the module loading APIs in order to support
+import attributes and JSON modules.
+
+`JS::CreateModuleRequest()` now takes an additional parameter to be able
+to set the module type. This parameter can be either
+`JS::ModuleType::JavaScript` or `JS::ModuleType::JSON`.
+
+Two functions that were previously always guaranteed to return, can now
+fail (i.e., can return a null pointer signifying a pending exception.)
+`JS::GetModuleScript()` can now fail if the module record passed to it
+is a synthetic module. `JS::GetRequestedModuleSpecifier()` can now fail
+if the requested module has an unsupported import attribute or the
+module has an unknown type.
+
+### Stencil API changes
+
+The APIs previously referring to "incremental encoding" are now named to
+refer to "collecting delazifications", and have moved to the
+`<js/experimental/JSStencil.h>` header.
+
+The data model of `JS::Stencil` now includes a list of delazifications,
+meaning that it can be used to cache the delazifications and can be used
+across threads.
+
+`JS::StartIncrementalEncoding()` is renamed to
+`JS::StartCollectingDelazifications()`, and no longer takes ownership of
+the stencil.
+It also gains an `alreadyStarted` boolean out parameter.
+
+`JS::FinishIncrementalEncoding()` is renamed to
+`JS::FinishCollectingDelazifications()`, and has gained a new overload
+that returns the `JS::Stencil` as an out parameter, instead of
+transcoding to a buffer.
+
+`JS::AbortIncrementalEncoding()` is simply renamed to
+`JS::AbortCollectingDelazifications()`.
+
+### Other API changes ###
+
+This is a non-exhaustive list of minor API changes and renames.
+
+- `JS::JobQueue::getIncumbentGlobal()` →
+  `JS::JobQueue::getHostDefinedData()` (you may be implementing this
+  virtual function in a subclass in your code)
+- `JS::Heap::address()` → `JS::Heap::unsafeAddress()`
+- `JSSecurityCallbacks` has an extra `codeForEvalGets` field
+- The `ConstUTF8CharsZ` overloads of `JS::UTF8CharsToNewTwoByteCharsZ()`
+  and `JS::LossyUTF8CharsToNewTwoByteCharsZ()` have been removed (the
+  `UTF8CharsZ` overloads can be used before the migration)
+- `JS::LossyUTF8CharsToNewLatin1CharsZ()` →
+  `mozilla::LossyConvertUTF8ToLatin1()` (switch can be done before the
+  migration, but beware that the behaviour of non-Latin1 codepoints is
+  different)
+
 ## ESR 115 to ESR 128 ##
 
 ### New API for column numbers ###
