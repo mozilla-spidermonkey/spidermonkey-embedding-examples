@@ -5,7 +5,7 @@ on:
     branches-ignore: [ esr* ]
   pull_request:
     branches-ignore: [ esr* ]
-  schedule: 
+  schedule:
     # every fifth day
     - cron: "10 10 1,5,10,15,20,25 * *"
 
