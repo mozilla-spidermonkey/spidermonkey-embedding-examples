@@ -5,7 +5,7 @@ on:
     branches-ignore: [ esr* ]
   pull_request:
     branches-ignore: [ esr* ]
-  schedule: 
+  schedule:
     # every fifth day
     - cron: "10 10 1,5,10,15,20,25 * *"
 
@@ -22,23 +22,19 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - name: Install deps
       run: |
-        sudo apt install ccache llvm clang lld meson ninja-build -y
-    - uses: actions-rs/toolchain@v1
-      with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          default: true
+        sudo apt install ccache libreadline-dev llvm clang lld meson ninja-build -y
+        rustup toolchain add --profile=minimal stable
+        cargo install cbindgen
     - name: Get SM pkg
       run: ./tools/get_sm.sh
     - name: ccache cache files
-      uses: actions/cache@v1.1.0
+      uses: actions/cache@v6
       with:
         path: ~/.ccache
         key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.xz') }}
@@ -57,8 +53,9 @@ jobs:
         ccache -z
         make
         sudo make install
+        sudo cp /usr/local/lib/pkgconfig/mozjs-*.pc /usr/local/lib/pkgconfig/mozjs.pc
         ccache -s
     - name: Build Examples
       run: |
-        meson _build || cat _build/meson-logs/meson-log.txt
+        meson setup _build || cat _build/meson-logs/meson-log.txt
         ninja -C _build
